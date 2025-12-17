@@ -1,0 +1,30 @@
+.logo {
+    width: 120px;
+    margin-bottom: 15px;
+}
+
+.card {
+    background: white;
+    padding: 25px;
+    border-radius: 18px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    text-align: center;
+}
+
+.stButton>button {
+    background: #0038a8;
+    color: white;
+    padding: 0.7rem 1.2rem;
+    border-radius: 12px;
+    font-size: 1rem;
+    border: none;
+}
+
+.number-box {
+    background: #0038a8;
+    color: white;
+    padding: 15px;
+    border-radius: 14px;
+    margin-bottom: 20px;
+    text-align: center;
+}
