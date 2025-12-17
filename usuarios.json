@@ -1,0 +1,17 @@
+{
+    "Admin": {
+        "senha": "1234",
+        "perfil": "ADMIN",
+        "status": "ativo"
+    },
+    "Julio": {
+        "senha": "senha123",
+        "perfil": "USER",
+        "status": "ativo"
+    },
+    "Cesar": {
+        "senha": "cesar123",
+        "perfil": "USER",
+        "status": "ativo"
+    }
+}
