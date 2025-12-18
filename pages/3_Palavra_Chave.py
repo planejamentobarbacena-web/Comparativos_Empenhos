@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import json
 import altair as alt
+import unicodedata
 
 from auth import login, exige_admin
 from components.header import render_header
@@ -21,10 +22,28 @@ st.title("🔎 Empenhos por Palavra-Chave")
 
 st.markdown(
     """
-    Digite uma **palavra ou expressão exata** presente na descrição do empenho  
+    Digite uma **palavra ou expressão** presente na descrição do empenho  
     (ex.: *carnaval*, *sonho de natal*, *festa das rosas*).
     """
 )
+
+# ==========================
+# Normalização de texto
+# ==========================
+def normalize_text(texto: str) -> str:
+    """Remove acentuação, cedilha e coloca em maiúscula"""
+    if not texto:
+        return ""
+    texto = texto.upper()
+    texto = unicodedata.normalize("NFD", texto)
+    texto = "".join([c for c in texto if unicodedata.category(c) != "Mn"])
+    return texto
+
+def singularize(word: str) -> str:
+    """Remove S do final para plural simples"""
+    if word.endswith("S") and len(word) > 3:
+        return word[:-1]
+    return word
 
 # ==========================
 # Carregar dados
@@ -34,6 +53,9 @@ df = load_empenhos()
 if df.empty:
     st.warning("Nenhum dado encontrado.")
     st.stop()
+
+# Normalizar coluna de especificação
+df["especificacao_norm"] = df["especificacao"].astype(str).apply(normalize_text).apply(singularize)
 
 # ==========================
 # Campo de busca
@@ -47,13 +69,13 @@ if not palavra:
     st.info("Digite uma palavra para iniciar a análise.")
     st.stop()
 
+# Normalizar input do usuário
+palavra_norm = singularize(normalize_text(palavra))
+
 # ==========================
 # Filtro na especificação
 # ==========================
-df_filtro = df[
-    df["especificacao"]
-    .str.contains(palavra, case=False, na=False)
-].copy()
+df_filtro = df[df["especificacao_norm"].str.contains(palavra_norm, na=False)].copy()
 
 if df_filtro.empty:
     st.warning("Nenhum empenho encontrado com essa palavra.")
@@ -116,17 +138,8 @@ st.dataframe(tabela, use_container_width=True)
 # ==========================
 # Download CSV
 # ==========================
-# ==========================
-# DataFrame para exportação
-# ==========================
-export_df = df_filtro[cols].copy()
-
-export_df["valorEmpenhadoBruto_num"] = export_df["valorEmpenhadoBruto_num"].apply(
-    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
-
+export_df = tabela.copy()
 csv = export_df.to_csv(index=False, sep=";").encode("utf-8")
-
 
 st.download_button(
     "⬇️ Baixar CSV – Palavra-Chave",
