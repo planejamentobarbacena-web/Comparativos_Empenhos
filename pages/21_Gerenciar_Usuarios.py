@@ -63,13 +63,6 @@ def salvar_usuarios(usuarios, sha, mensagem):
         st.stop()
 
 
-# =========================
-# SEGURANÇA
-# =========================
-login()
-render_header()
-exige_admin()
-
 st.set_page_config(page_title="Gerenciar Usuários", layout="centered")
 st.title("👥 Gerenciar Usuários")
 
@@ -107,4 +100,5 @@ for nome, dados in usuarios.items():
                 salvar_usuarios(usuarios, sha_atual, f"Remove usuário {nome}")
                 st.success(f"Usuário {nome} excluído")
                 st.rerun()
+
 
