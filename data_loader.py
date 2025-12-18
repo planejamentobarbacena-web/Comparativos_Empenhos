@@ -6,10 +6,15 @@ import streamlit as st
 @st.cache_data(show_spinner="📂 Carregando empenhos...")
 def load_empenhos():
     """
-    Carrega todos os arquivos CSV de empenhos da pasta 'data', 
-    tentando diferentes encodings para evitar problemas de acentuação.
+    Carrega arquivos de empenhos da pasta /data
+    Suporta CSV e XLSX
     """
-    arquivos = sorted(Path("data").glob("*_empenhos.csv"))
+    pasta = Path("data")
+
+    arquivos = sorted(
+        list(pasta.glob("*_empenhos.csv")) +
+        list(pasta.glob("*_empenhos.xlsx"))
+    )
 
     if not arquivos:
         return pd.DataFrame()
@@ -17,32 +22,46 @@ def load_empenhos():
     dfs = []
 
     for arq in arquivos:
-        encodings = ["utf-8", "utf-8-sig", "latin1"]
         df = None
-        for enc in encodings:
-            try:
-                df = pd.read_csv(
-                    arq,
-                    sep=";",
-                    dtype=str,
-                    encoding=enc,
-                    engine="python",
-                    on_bad_lines="skip"
-                )
-                break  # leu corretamente
-            except Exception:
+
+        # =====================
+        # CSV
+        # =====================
+        if arq.suffix.lower() == ".csv":
+            encodings = ["utf-8", "utf-8-sig", "latin1"]
+            for enc in encodings:
+                try:
+                    df = pd.read_csv(
+                        arq,
+                        sep=";",
+                        dtype=str,
+                        encoding=enc,
+                        engine="python",
+                        on_bad_lines="skip"
+                    )
+                    break
+                except Exception:
+                    continue
+
+            if df is None:
+                st.warning(f"⚠️ Não foi possível ler {arq.name}")
                 continue
-        
-        if df is None:
-            st.warning(f"⚠️ Não foi possível ler {arq.name}.")
-            continue
 
-        # Corrigir caracteres estranhos (ex: Ã)
-        for col in df.select_dtypes(include=["object"]).columns:
-            df[col] = df[col].astype(str).apply(lambda x: x.encode('utf-8', errors='replace').decode('utf-8'))
+        # =====================
+        # XLSX (sem problemas de acento)
+        # =====================
+        elif arq.suffix.lower() == ".xlsx":
+            try:
+                df = pd.read_excel(arq, dtype=str)
+            except Exception as e:
+                st.warning(f"⚠️ Erro ao ler {arq.name}: {e}")
+                continue
 
-        # Extrair o ano do nome do arquivo
+        # =====================
+        # ANO PELO NOME DO ARQUIVO
+        # =====================
         df["Ano"] = arq.stem.split("_")[0]
+
         dfs.append(df)
 
     if not dfs:
@@ -50,7 +69,9 @@ def load_empenhos():
 
     df = pd.concat(dfs, ignore_index=True)
 
-    # Criar colunas numéricas padronizadas (sem espaços, vírgulas para ponto)
+    # =====================
+    # CAMPOS NUMÉRICOS
+    # =====================
     mapping = {
         "valorEmpenhadoBruto": "valorEmpenhadoBruto_num",
         "valorEmpenhadoAnulado": "valorEmpenhadoAnulado_num",
@@ -69,22 +90,18 @@ def load_empenhos():
         else:
             df[destino] = 0.0
 
-    # Mantém compatibilidade antiga
+    # Compatibilidade antiga
     df["Valor"] = df["valorEmpenhadoBruto_num"]
 
-    # Limpeza de strings para evitar problemas em filtros
+    # =====================
+    # LIMPEZA DE TEXTO
+    # =====================
     for col in ["nomeCredor", "numRecurso", "numNaturezaEmp"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
         else:
             df[col] = ""
 
-    # Garantir tipos consistentes
     df["Ano"] = df["Ano"].astype(str)
-    for col in ["valorEmpenhadoBruto_num", "valorEmpenhadoAnulado_num", "valorBaixadoBruto_num"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-        else:
-            df[col] = 0.0
 
     return df
