@@ -3,6 +3,13 @@ from github_manager import upload_arquivo, excluir_arquivo
 
 st.title("📤 Gerenciar CSVs no GitHub")
 
+# ---------------------------
+# Mensagem pós-atualização
+# ---------------------------
+if st.session_state.get("arquivos_atualizados"):
+    st.success("🔄 Arquivos atualizados com sucesso.")
+    del st.session_state["arquivos_atualizados"]
+
 # =========================
 # UPLOAD
 # =========================
@@ -22,6 +29,7 @@ if arquivo is not None:
 
             st.success("✅ Upload realizado com sucesso!")
             st.cache_data.clear()
+            st.session_state["arquivos_atualizados"] = True
             st.rerun()
 
         except Exception as e:
@@ -46,6 +54,7 @@ if st.button("Excluir CSV do GitHub") and arquivo_excluir:
 
         st.success("🗑️ Arquivo removido com sucesso!")
         st.cache_data.clear()
+        st.session_state["arquivos_atualizados"] = True
         st.rerun()
 
     except Exception as e:
