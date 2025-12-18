@@ -1,9 +1,7 @@
 import streamlit as st
-import os
-import json
 import altair as alt
 
-from auth import login, exige_admin
+from auth import login
 from components.header import render_header
 from data_loader import load_empenhos  
 
@@ -13,71 +11,69 @@ render_header()
 
 st.title("💰 Consulta por Fonte de Recurso")
 
+# =======================
+# CARREGAR DADOS
+# =======================
 df = load_empenhos()
 if df.empty:
     st.stop()
 
-fonte = st.selectbox(
-    "Selecione a Fonte:",
-    ["Todos"] + sorted(df["numRecurso"].dropna().unique())
+# =======================
+# FILTRO POR EXERCÍCIO
+# =======================
+anos = sorted(df["Ano"].unique())
+
+anos_sel = st.multiselect(
+    "📅 Selecione o(s) Exercício(s)",
+    anos,
+    default=anos
 )
 
-if fonte == "Todos":
-    df_sel = df.copy()
-else:
-    df_sel = df[df["numRecurso"] == fonte]
+df = df[df["Ano"].isin(anos_sel)]
 
+# =======================
+# FILTRO POR FONTE
+# =======================
+fontes = sorted(df["numRecurso"].dropna().unique())
+
+fontes_sel = st.multiselect(
+    "💰 Selecione a(s) Fonte(s)",
+    fontes
+)
+
+if fontes_sel:
+    df_sel = df[df["numRecurso"].isin(fontes_sel)]
+else:
+    df_sel = df.copy()
+
+# =======================
+# AGRUPAMENTO
+# =======================
 comparativo = (
     df_sel
-    .groupby("Ano", as_index=False)[
-        ["valorEmpenhadoBruto_num", "valorEmpenhadoAnulado_num", "valorBaixadoBruto_num"]
-    ]
+    .groupby(["Ano", "numRecurso"], as_index=False)["valorEmpenhadoBruto_num"]
     .sum()
 )
 
-comparativo_display = comparativo.rename(columns={
-    "valorEmpenhadoBruto_num": "Empenhado Bruto",
-    "valorEmpenhadoAnulado_num": "Empenhado Anulado",
-    "valorBaixadoBruto_num": "Baixado Bruto"
-})
+if comparativo.empty:
+    st.info("Nenhum dado para os filtros selecionados.")
+    st.stop()
 
-
-df_melt = comparativo.melt(id_vars="Ano", var_name="Tipo", value_name="Valor")
-df_melt["Tipo"] = df_melt["Tipo"].map({
-    "valorEmpenhadoBruto_num": "Empenhado Bruto",
-    "valorEmpenhadoAnulado_num": "Empenhado Anulado",
-    "valorBaixadoBruto_num": "Baixado Bruto"
-})
-
+# =======================
+# GRÁFICO
+# =======================
 graf = (
-    alt.Chart(df_melt)
-    .mark_bar(size=45)   # barras finas
+    alt.Chart(comparativo)
+    .mark_bar(size=35)
     .encode(
-        x=alt.X(
-            "Tipo:N",
-            title="Tipo de Valor",
-            axis=alt.Axis(labelAngle=0)
-        ),
-        xOffset=alt.XOffset(
-            "Ano:N",
-            scale=alt.Scale(
-                paddingInner=0.1,
-                paddingOuter=0.1
-            ),
-            title="Exercício"
-        ),
-        y=alt.Y(
-            "Valor:Q",
-            title="Valor (R$)"
-        ),
-        color=alt.Color(
-            "Ano:N",
-            title="Exercício"
-        ),
+        x=alt.X("Ano:N", title="Exercício"),
+        xOffset=alt.XOffset("numRecurso:N", title="Fonte"),
+        y=alt.Y("valorEmpenhadoBruto_num:Q", title="Valor Empenhado (R$)"),
+        color=alt.Color("numRecurso:N", title="Fonte"),
         tooltip=[
             "Ano:N",
-            "Tipo:N",
-            alt.Tooltip("Valor:Q", format=",.2f")
+            "numRecurso:N",
+            alt.Tooltip("valorEmpenhadoBruto_num:Q", format=",.2f")
         ]
     )
     .properties(height=420)
@@ -86,14 +82,37 @@ graf = (
 st.altair_chart(graf, use_container_width=True)
 
 # =======================
-# Tabela abaixo do gráfico
+# TABELA
 # =======================
-comparativo_display_format = comparativo_display.copy()
+st.subheader("📄 Dados Detalhados")
 
-for col in ["Empenhado Bruto", "Empenhado Anulado", "Baixado Bruto"]:
-    comparativo_display_format[col] = comparativo_display_format[col].apply(
-        lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    )
+tabela = comparativo.copy()
+tabela["Valor Empenhado"] = tabela["valorEmpenhadoBruto_num"].apply(
+    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
 
-st.dataframe(comparativo_display_format, use_container_width=True)
+tabela = tabela[["Ano", "numRecurso", "Valor Empenhado"]]
+st.dataframe(tabela, use_container_width=True)
 
+# =======================
+# DOWNLOAD CSV
+# =======================
+st.divider()
+
+csv_bytes = comparativo.rename(columns={
+    "Ano": "Exercício",
+    "numRecurso": "Fonte",
+    "valorEmpenhadoBruto_num": "Valor Empenhado"
+}).to_csv(
+    index=False,
+    sep=";",
+    decimal=",",
+    encoding="utf-8-sig"
+)
+
+st.download_button(
+    "📥 Baixar CSV dos dados filtrados",
+    csv_bytes,
+    file_name="consulta_por_fonte_filtrada.csv",
+    mime="text/csv"
+)
