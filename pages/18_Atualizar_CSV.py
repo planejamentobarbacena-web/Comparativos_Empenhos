@@ -8,7 +8,7 @@ login()
 render_header()
 exige_admin()
 
-st.title("📤 Gerenciar CSVs")
+st.title("📤 Gerenciar Arquivos")
 
 # ---------------------------
 # Mensagem pós-atualização
@@ -20,10 +20,10 @@ if st.session_state.get("arquivos_atualizados"):
 # =========================
 # UPLOAD
 # =========================
-arquivo = st.file_uploader("Selecione um CSV", type=["csv"])
+arquivo = st.file_uploader("Selecione um CSV", type=["csv", "xlsx"]
 
 if arquivo is not None:
-    if st.button("Enviar CSV"):
+    if st.button("Enviar Arquivo"):
         try:
             # ✅ bytes corretos para o GitHub
             conteudo_bytes = arquivo.getvalue()
@@ -46,7 +46,7 @@ if arquivo is not None:
 # EXCLUSÃO
 # =========================
 st.divider()
-st.subheader("🗑️ Excluir CSV")
+st.subheader("🗑️ Excluir Arquivo")
 
 arquivo_excluir = st.text_input("Nome do CSV (ex: 2024_empenhos.csv)")
 
