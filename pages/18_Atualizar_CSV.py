@@ -1,5 +1,9 @@
 import streamlit as st
 from github_manager import upload_arquivo, excluir_arquivo
+# 🔐 Segurança
+login()
+render_header()
+exige_admin()
 
 st.title("📤 Gerenciar CSVs")
 
