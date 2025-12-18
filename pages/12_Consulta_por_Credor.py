@@ -97,6 +97,29 @@ tabela = comparativo.copy()
 tabela["Valor Empenhado"] = tabela["valorEmpenhadoBruto_num"].apply(
     lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
+# DOWNLOAD CSV (FILTRADO)
+# =======================
+st.divider()
+
+csv_download = comparativo.rename(columns={
+    "Ano": "Exercício",
+    "nomeCredor": "Credor",
+    "valorEmpenhadoBruto_num": "Valor Empenhado"
+})
+
+csv_bytes = csv_download.to_csv(
+    index=False,
+    sep=";",
+    decimal=",",
+    encoding="utf-8-sig"
+)
+
+st.download_button(
+    label="📥 Baixar CSV dos dados filtrados",
+    data=csv_bytes,
+    file_name="consulta_por_credor_filtrada.csv",
+    mime="text/csv"
+)
 
 tabela = tabela[["Ano", "nomeCredor", "Valor Empenhado"]]
 
