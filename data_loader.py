@@ -3,49 +3,54 @@ import pandas as pd
 from pathlib import Path
 import streamlit as st
 
-# Diretório base relativo a este arquivo
-BASE_DIR = Path(__file__).parent
-PASTA_DATA = BASE_DIR / "data"
-PASTA_DATA.mkdir(exist_ok=True)  # cria a pasta se não existir
-
 @st.cache_data(show_spinner="📂 Carregando empenhos...")
 def load_empenhos():
-    arquivos = sorted(PASTA_DATA.glob("*_empenhos.csv"))
+    """
+    Carrega todos os arquivos CSV de empenhos da pasta 'data', 
+    tentando diferentes encodings para evitar problemas de acentuação.
+    """
+    arquivos = sorted(Path("data").glob("*_empenhos.csv"))
 
-    # Se não houver arquivos, retorna DataFrame vazio
     if not arquivos:
         return pd.DataFrame()
 
     dfs = []
 
     for arq in arquivos:
-        try:
-            df = pd.read_csv(
-                arq,
-                sep=";",
-                dtype=str,
-                encoding="utf-8",
-                engine="python",
-                on_bad_lines="skip"
-            )
-        except UnicodeDecodeError:
-            df = pd.read_csv(
-                arq,
-                sep=";",
-                dtype=str,
-                encoding="latin1",
-                engine="python",
-                on_bad_lines="skip"
-            )
+        encodings = ["utf-8", "utf-8-sig", "latin1"]
+        df = None
+        for enc in encodings:
+            try:
+                df = pd.read_csv(
+                    arq,
+                    sep=";",
+                    dtype=str,
+                    encoding=enc,
+                    engine="python",
+                    on_bad_lines="skip"
+                )
+                break  # leu corretamente
+            except Exception:
+                continue
+        
+        if df is None:
+            st.warning(f"⚠️ Não foi possível ler {arq.name}.")
+            continue
+
+        # Corrigir caracteres estranhos (ex: Ã)
+        for col in df.select_dtypes(include=["object"]).columns:
+            df[col] = df[col].astype(str).apply(lambda x: x.encode('utf-8', errors='replace').decode('utf-8'))
 
         # Extrair o ano do nome do arquivo
         df["Ano"] = arq.stem.split("_")[0]
         dfs.append(df)
 
-    # Concatenar todos os arquivos
+    if not dfs:
+        return pd.DataFrame()
+
     df = pd.concat(dfs, ignore_index=True)
 
-    # Criar colunas numéricas padronizadas (remover pontos, trocar vírgulas por ponto)
+    # Criar colunas numéricas padronizadas (sem espaços, vírgulas para ponto)
     mapping = {
         "valorEmpenhadoBruto": "valorEmpenhadoBruto_num",
         "valorEmpenhadoAnulado": "valorEmpenhadoAnulado_num",
@@ -64,10 +69,10 @@ def load_empenhos():
         else:
             df[destino] = 0.0
 
-    # Compatibilidade antiga
+    # Mantém compatibilidade antiga
     df["Valor"] = df["valorEmpenhadoBruto_num"]
 
-    # Limpeza de strings
+    # Limpeza de strings para evitar problemas em filtros
     for col in ["nomeCredor", "numRecurso", "numNaturezaEmp"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
@@ -77,6 +82,9 @@ def load_empenhos():
     # Garantir tipos consistentes
     df["Ano"] = df["Ano"].astype(str)
     for col in ["valorEmpenhadoBruto_num", "valorEmpenhadoAnulado_num", "valorBaixadoBruto_num"]:
-        df[col] = pd.to_numeric(df.get(col, pd.Series([0]*len(df))), errors="coerce").fillna(0.0)
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        else:
+            df[col] = 0.0
 
     return df
