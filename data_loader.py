@@ -9,7 +9,7 @@ def load_empenhos():
     Carrega todos os arquivos CSV de empenhos da pasta 'data', 
     tentando diferentes encodings para evitar problemas de acentuação.
     """
-    arquivos = sorted(Path("data").glob("*_empenhos.csv"))
+    arquivos = sorted(Path("data").glob("*_empenhos.xlsx"))
 
     if not arquivos:
         return pd.DataFrame()
@@ -21,7 +21,7 @@ def load_empenhos():
         df = None
         for enc in encodings:
             try:
-                df = pd.read_csv(
+                df = pd.read_xlsx(
                     arq,
                     sep=";",
                     dtype=str,
