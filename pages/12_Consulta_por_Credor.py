@@ -88,6 +88,7 @@ graf = (
     )
     .properties(height=420)
 )
+st.altair_chart(graf, use_container_width=True)
 
 st.subheader("📊 Detalhamento por Exercício e Credor")
 
