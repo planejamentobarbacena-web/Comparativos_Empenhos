@@ -21,7 +21,7 @@ def load_empenhos():
         df = None
         for enc in encodings:
             try:
-                df = pd.read_csv(
+                df = pd.read_xlsx(
                     arq,
                     sep=";",
                     dtype=str,
