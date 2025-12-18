@@ -13,10 +13,5 @@
     "senha": "12345",
     "perfil": "USER",
     "status": "ativo"
-  },
-  "Maria Souza": {
-    "senha": "abcdef",
-    "perfil": "USER",
-    "status": "ativo"
   }
 }
