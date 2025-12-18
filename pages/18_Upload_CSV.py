@@ -1,61 +1,73 @@
 import streamlit as st
-import os
-import json
-from pathlib import Path 
 from auth import login, exige_admin
-from components.header import render_header
+from github_manager import upload_arquivo, excluir_arquivo
 
-# 🔐 Segurança
+# ----------------------------
+# Segurança
+# ----------------------------
 login()
-render_header()
 exige_admin()
 
-st.set_page_config(page_title="Upload de CSV", layout="centered")
+st.set_page_config(page_title="Gerenciar CSVs", layout="centered")
 
+st.title("📂 Gerenciar arquivos CSV (GitHub)")
 
-st.title("📤 Enviar arquivos CSV de Empenhos")
+st.markdown(
+    """
+    - Upload e exclusão **afetam diretamente o GitHub**
+    - Os painéis refletem automaticamente as mudanças
+    """
+)
 
-PASTA_DATA = Path("data")
-PASTA_DATA.mkdir(exist_ok=True)
+st.divider()
+
+# ======================================================
+# UPLOAD
+# ======================================================
+st.subheader("📤 Enviar novo CSV")
 
 arquivo = st.file_uploader(
-    "Selecione o arquivo CSV",
+    "Selecione um arquivo CSV",
     type=["csv"]
 )
 
 if arquivo:
-    nome = arquivo.name
-    caminho = PASTA_DATA / nome
+    try:
+        upload_arquivo(
+            conteudo_bytes=arquivo.getbuffer(),
+            caminho_repo=f"data/{arquivo.name}",
+            mensagem=f"Adiciona {arquivo.name}"
+        )
+        st.success(f"✅ Arquivo **{arquivo.name}** enviado com sucesso!")
+        st.cache_data.clear()
+        st.rerun()
 
-    # Guarda o arquivo em memória
-    if "arquivo_upload" not in st.session_state:
-        st.session_state.arquivo_upload = None
-        st.session_state.confirmar_substituicao = False
+    except Exception as e:
+        st.error(f"Erro no upload: {e}")
 
-    st.session_state.arquivo_upload = arquivo
+st.divider()
 
-    if caminho.exists():
-        st.warning(f"⚠️ O arquivo **{nome}** já existe.")
+# ======================================================
+# EXCLUSÃO
+# ======================================================
+st.subheader("🗑️ Excluir CSV do GitHub")
 
-        if not st.session_state.confirmar_substituicao:
-            if st.button("✅ Sim, substituir"):
-                st.session_state.confirmar_substituicao = True
-                st.rerun()
+nome_excluir = st.text_input(
+    "Nome do arquivo (ex: 2024_empenhos.csv)"
+)
 
-            if st.button("❌ Cancelar"):
-                st.session_state.arquivo_upload = None
-                st.session_state.confirmar_substituicao = False
-                st.info("Operação cancelada.")
-        else:
-            with open(caminho, "wb") as f:
-                f.write(st.session_state.arquivo_upload.getbuffer())
-
-            st.success(f"✅ Arquivo **{nome}** substituído com sucesso.")
-            st.session_state.confirmar_substituicao = False
-            st.session_state.arquivo_upload = None
-
+if st.button("❌ Excluir arquivo"):
+    if not nome_excluir:
+        st.warning("Informe o nome do arquivo.")
     else:
-        with open(caminho, "wb") as f:
-            f.write(arquivo.getbuffer())
+        try:
+            excluir_arquivo(
+                caminho_repo=f"data/{nome_excluir}",
+                mensagem=f"Remove {nome_excluir}"
+            )
+            st.success(f"🗑️ Arquivo **{nome_excluir}** removido com sucesso!")
+            st.cache_data.clear()
+            st.rerun()
 
-        st.success(f"✅ Arquivo **{nome}** enviado com sucesso.")
+        except Exception as e:
+            st.error(f"Erro ao excluir: {e}")
