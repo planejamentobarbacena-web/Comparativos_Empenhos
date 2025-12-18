@@ -137,3 +137,4 @@ else:
                     salvar_json_github(ARQ_USUARIOS, usuarios, f"Remove usuário {nome}")
                     st.success(f"Usuário {nome} excluído")
                     st.experimental_rerun()
+
