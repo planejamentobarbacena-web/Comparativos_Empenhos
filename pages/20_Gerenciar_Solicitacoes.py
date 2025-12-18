@@ -59,8 +59,8 @@ def rejeitar_usuario(nome):
 solicitacoes = carregar_json(file_solic)
 usuarios = carregar_json(file_users)
 
-# Filtrar pendentes
-pendentes = {k: v for k, v in solicitacoes.items() if v.get("status") == "pendente"}
+# Filtrar pendentes (case-insensitive)
+pendentes = {k: v for k, v in solicitacoes.items() if v.get("status", "").lower() == "pendente"}
 
 if not pendentes:
     st.info("📭 Nenhum cadastro solicitado no momento.")
