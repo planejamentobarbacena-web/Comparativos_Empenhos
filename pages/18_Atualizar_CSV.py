@@ -1,5 +1,8 @@
 import streamlit as st
 from github_manager import upload_arquivo, excluir_arquivo
+from auth import login, exige_admin
+from components.header import render_header
+
 # 🔐 Segurança
 login()
 render_header()
