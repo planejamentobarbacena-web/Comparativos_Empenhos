@@ -14,21 +14,42 @@ render_header()
 st.title("📁 Consulta por Credor")
 
 # Carregar dados
+# Carregar dados
 df = load_empenhos()
 if df.empty:
     st.warning("Nenhum dado carregado.")
     st.stop()
 
-# Seleção de credor
-credor = st.selectbox(
-    "Selecione o Credor:",
-    ["Todos"] + sorted(df["nomeCredor"].dropna().unique())
+# =======================
+# FILTRO POR EXERCÍCIO
+# =======================
+anos_disponiveis = sorted(df["Ano"].unique())
+
+anos_selecionados = st.multiselect(
+    "📅 Selecione o(s) Exercício(s)",
+    anos_disponiveis,
+    default=anos_disponiveis  # começa com todos
 )
 
-if credor == "Todos":
-    df_sel = df.copy()
+if anos_selecionados:
+    df = df[df["Ano"].isin(anos_selecionados)]
+
+
+# =======================
+# FILTRO POR CREDOR
+# =======================
+lista_credores = sorted(df["nomeCredor"].dropna().unique())
+
+credores_selecionados = st.multiselect(
+    "🏢 Selecione o(s) Credor(es)",
+    lista_credores
+)
+
+if credores_selecionados:
+    df_sel = df[df["nomeCredor"].isin(credores_selecionados)]
 else:
-    df_sel = df[df["nomeCredor"] == credor]
+    df_sel = df.copy()
+
 
 # Agrupamento por Ano
 comparativo = (
