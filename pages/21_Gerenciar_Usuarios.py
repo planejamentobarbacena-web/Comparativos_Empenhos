@@ -4,6 +4,10 @@ import requests
 import base64
 from auth import login, exige_admin
 from components.header import render_header
+# 🔐 Segurança
+login()
+render_header()
+exige_admin()
 
 # =========================
 # CONFIGURAÇÃO GITHUB
@@ -103,3 +107,4 @@ for nome, dados in usuarios.items():
                 salvar_usuarios(usuarios, sha_atual, f"Remove usuário {nome}")
                 st.success(f"Usuário {nome} excluído")
                 st.rerun()
+
