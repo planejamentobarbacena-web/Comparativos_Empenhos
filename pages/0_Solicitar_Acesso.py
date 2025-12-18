@@ -1,40 +1,68 @@
 import streamlit as st
 import json
-import os
+import requests
+import base64
 
+st.set_page_config(page_title="Solicitar Acesso", layout="centered")
 st.title("📝 Solicitar Acesso ao Sistema")
 
+# ----------------------------
+# Inputs do usuário
+# ----------------------------
 nome = st.text_input("Nome de usuário")
 email = st.text_input("E-mail")
 senha = st.text_input("Senha", type="password")
 
-file_path = os.path.join(os.getcwd(), "solicitacoes.json")
+# ----------------------------
+# Configuração GitHub
+# ----------------------------
+REPO = "planejamentobarbacena-web/Comparativos_Empenhos"
+BRANCH = "master"
+FILE_SOLIC = "data/solicitacoes.json"
+TOKEN = st.secrets["GITHUB_TOKEN"]
 
-# ==========================
-# Funções seguras
-# ==========================
-def carregar_json(caminho):
-    if not os.path.exists(caminho):
-        return {}
-    try:
-        with open(caminho, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        return {}
+HEADERS = {
+    "Authorization": f"token {TOKEN}",
+    "Accept": "application/vnd.github.v3+json"
+}
 
-def salvar_json(caminho, dados):
-    with open(caminho, "w", encoding="utf-8") as f:
-        json.dump(dados, f, indent=4, ensure_ascii=False)
+# ----------------------------
+# Funções GitHub
+# ----------------------------
+def carregar_github(caminho):
+    url = f"https://api.github.com/repos/{REPO}/contents/{caminho}"
+    r = requests.get(url, headers=HEADERS)
+    if r.status_code != 200:
+        return {}, None
+    info = r.json()
+    dados = json.loads(requests.get(info["download_url"]).text)
+    return dados, info["sha"]
 
-# ==========================
-# Botão
-# ==========================
+def salvar_github(dados, caminho, mensagem):
+    _, sha_atual = carregar_github(caminho)
+    conteudo = base64.b64encode(
+        json.dumps(dados, indent=2, ensure_ascii=False).encode("utf-8")
+    ).decode("utf-8")
+    payload = {
+        "message": mensagem,
+        "content": conteudo,
+        "sha": sha_atual,
+        "branch": BRANCH
+    }
+    r = requests.put(f"https://api.github.com/repos/{REPO}/contents/{caminho}", json=payload, headers=HEADERS)
+    if r.status_code not in (200, 201):
+        st.error(r.json())
+        st.stop()
+
+# ----------------------------
+# Botão de envio
+# ----------------------------
 if st.button("📨 Enviar solicitação"):
     if not nome or not email or not senha:
         st.error("Preencha todos os campos!")
         st.stop()
 
-    solicitacoes = carregar_json(file_path)
+    solicitacoes, _ = carregar_github(FILE_SOLIC)
 
     if nome in solicitacoes:
         st.warning("Este nome de usuário já possui uma solicitação pendente.")
@@ -47,7 +75,5 @@ if st.button("📨 Enviar solicitação"):
         "status": "pendente"
     }
 
-    salvar_json(file_path, solicitacoes)
-
+    salvar_github(solicitacoes, FILE_SOLIC, f"Nova solicitação: {nome}")
     st.success("✅ Solicitação enviada! Aguarde aprovação do administrador.")
-    st.stop()
