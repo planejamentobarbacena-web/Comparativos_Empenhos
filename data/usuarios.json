@@ -9,6 +9,11 @@
         "perfil": "USER",
         "status": "ativo"
     },
+        "Tamara": {
+        "senha": "12345",
+        "perfil": "USER",
+        "status": "ativo"
+    },
     "Cesar": {
         "senha": "cesar123",
         "perfil": "USER",
