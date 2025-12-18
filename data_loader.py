@@ -1,14 +1,11 @@
-# data_loader.py
 import pandas as pd
 from pathlib import Path
 import streamlit as st
 
-@st.cache_data(show_spinner="📂 Carregando empenhos...")
+
+@st.cache_data(show_spinner="Carregando empenhos...")
 def load_empenhos():
-    """
-    Carrega arquivos de empenhos da pasta /data
-    Suporta CSV e XLSX
-    """
+
     pasta = Path("data")
 
     arquivos = sorted(
@@ -44,21 +41,21 @@ def load_empenhos():
                     continue
 
             if df is None:
-                st.warning(f"⚠️ Não foi possível ler {arq.name}")
+                st.warning(f"Não foi possível ler {arq.name}")
                 continue
 
         # =====================
-        # XLSX (sem problemas de acento)
+        # XLSX
         # =====================
         elif arq.suffix.lower() == ".xlsx":
             try:
                 df = pd.read_excel(arq, dtype=str)
             except Exception as e:
-                st.warning(f"⚠️ Erro ao ler {arq.name}: {e}")
+                st.warning(f"Erro ao ler {arq.name}: {e}")
                 continue
 
         # =====================
-        # ANO PELO NOME DO ARQUIVO
+        # ANO
         # =====================
         df["Ano"] = arq.stem.split("_")[0]
 
@@ -90,11 +87,10 @@ def load_empenhos():
         else:
             df[destino] = 0.0
 
-    # Compatibilidade antiga
     df["Valor"] = df["valorEmpenhadoBruto_num"]
 
     # =====================
-    # LIMPEZA DE TEXTO
+    # LIMPEZA
     # =====================
     for col in ["nomeCredor", "numRecurso", "numNaturezaEmp"]:
         if col in df.columns:
