@@ -1,7 +1,7 @@
 import streamlit as st
 from github_manager import upload_arquivo, excluir_arquivo
 
-st.title("📤 Gerenciar CSVs no GitHub")
+st.title("📤 Gerenciar CSVs")
 
 # ---------------------------
 # Mensagem pós-atualização
@@ -16,7 +16,7 @@ if st.session_state.get("arquivos_atualizados"):
 arquivo = st.file_uploader("Selecione um CSV", type=["csv"])
 
 if arquivo is not None:
-    if st.button("Enviar CSV para o GitHub"):
+    if st.button("Enviar CSV"):
         try:
             # ✅ bytes corretos para o GitHub
             conteudo_bytes = arquivo.getvalue()
