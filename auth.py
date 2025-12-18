@@ -2,7 +2,8 @@ import streamlit as st
 import json
 from pathlib import Path
 
-USERS_FILE = Path("usuarios.json")
+# 📁 Arquivo de usuários agora fica na pasta data
+USERS_FILE = Path("data/usuarios.json")
 
 
 def carregar_usuarios():
@@ -10,6 +11,12 @@ def carregar_usuarios():
         with open(USERS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
+
+
+def salvar_usuarios(usuarios: dict):
+    USERS_FILE.parent.mkdir(exist_ok=True)  # garante pasta data
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(usuarios, f, indent=2, ensure_ascii=False)
 
 
 def login():
