@@ -13,5 +13,10 @@
     "senha": "12345",
     "perfil": "USER",
     "status": "ativo"
+  },
+  "Joao Silva": {
+    "senha": "123456",
+    "perfil": "USER",
+    "status": "ativo"
   }
 }
