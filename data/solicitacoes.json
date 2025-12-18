@@ -2,11 +2,11 @@
   "Joao Silva": {
     "email": "joao.silva@exemplo.com",
     "senha": "123456",
-    "status": "aprovado"
+    "status": "pendente"
   },
   "Maria Souza": {
     "email": "maria.souza@exemplo.com",
     "senha": "abcdef",
-    "status": "pendente"
+    "status": "aprovado"
   }
 }
