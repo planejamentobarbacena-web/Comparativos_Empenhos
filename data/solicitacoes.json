@@ -1,2 +1,12 @@
 {
+  "Joao Silva": {
+    "email": "joao.silva@exemplo.com",
+    "senha": "123456",
+    "status": "aprovado"
+  },
+  "Maria Souza": {
+    "email": "maria.souza@exemplo.com",
+    "senha": "abcdef",
+    "status": "aprovado"
+  }
 }
