@@ -4,12 +4,7 @@
     "perfil": "ADMIN",
     "status": "ativo"
   },
-  "Julio": {
-    "senha": "senha",
-    "perfil": "USER",
-    "status": "ativo"
-  },
-    "Joao": {
+  "Joao": {
     "senha": "123",
     "perfil": "USER",
     "status": "ativo"
