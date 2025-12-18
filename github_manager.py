@@ -2,25 +2,21 @@ import base64
 import requests
 import os
 
-# ----------------------------
-# CONFIGURAÇÃO
-# ----------------------------
 REPO = "planejamentobarbacena-web/Comparativos_Empenhos"
 BRANCH = "master"
 
-TOKEN = os.getenv("GITHUB_TOKEN")  # usa Secrets do Streamlit
+TOKEN = os.getenv("GITHUB_TOKEN")
 HEADERS = {
     "Authorization": f"token {TOKEN}",
     "Accept": "application/vnd.github.v3+json"
 }
 
-# ----------------------------
-# UPLOAD DE ARQUIVO
-# ----------------------------
-def upload_arquivo(conteudo_bytes, caminho_repo, mensagem="Adicionando arquivo"):
+def upload_arquivo(conteudo_bytes, caminho_repo, mensagem="Atualizando arquivo"):
     conteudo_base64 = base64.b64encode(conteudo_bytes).decode("utf-8")
-
     url = f"https://api.github.com/repos/{REPO}/contents/{caminho_repo}"
+
+    # 🔎 verifica se o arquivo já existe
+    r_get = requests.get(url, headers=HEADERS)
 
     data = {
         "message": mensagem,
@@ -28,16 +24,18 @@ def upload_arquivo(conteudo_bytes, caminho_repo, mensagem="Adicionando arquivo")
         "branch": BRANCH
     }
 
-    r = requests.put(url, json=data, headers=HEADERS)
+    # Se existir, precisa enviar o SHA
+    if r_get.status_code == 200:
+        sha = r_get.json()["sha"]
+        data["sha"] = sha
 
-    if r.status_code not in [200, 201]:
-        raise Exception(r.json())
+    r_put = requests.put(url, json=data, headers=HEADERS)
 
-    return r.json()
+    if r_put.status_code not in [200, 201]:
+        raise Exception(r_put.json())
 
-# ----------------------------
-# EXCLUSÃO DE ARQUIVO
-# ----------------------------
+    return r_put.json()
+
 def excluir_arquivo(caminho_repo, mensagem="Removendo arquivo"):
     url = f"https://api.github.com/repos/{REPO}/contents/{caminho_repo}"
 
