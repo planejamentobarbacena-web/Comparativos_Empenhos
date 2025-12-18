@@ -2,7 +2,7 @@
   "Joao Silva": {
     "email": "joao.silva@exemplo.com",
     "senha": "123456",
-    "status": "aprovado"
+    "status": "rejeitado"
   },
   "Maria Souza": {
     "email": "maria.souza@exemplo.com",
