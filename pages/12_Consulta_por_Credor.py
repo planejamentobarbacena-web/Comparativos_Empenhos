@@ -58,44 +58,29 @@ comparativo = (
 )
 
 
-# Renomear colunas para exibição
-comparativo_display = comparativo.rename(columns={
-    "valorEmpenhadoBruto_num": "Empenhado Bruto",
-    "valorEmpenhadoAnulado_num": "Empenhado Anulado",
-    "valorBaixadoBruto_num": "Baixado Bruto"
-})
-
-# Melt para gráfico
-df_melt = comparativo.melt(id_vars="Ano", var_name="Tipo", value_name="Valor")
-df_melt["Tipo"] = df_melt["Tipo"].map({
-    "valorEmpenhadoBruto_num": "Empenhado Bruto",
-    "valorEmpenhadoAnulado_num": "Empenhado Anulado",
-    "valorBaixadoBruto_num": "Baixado Bruto"
-})
 
 # =======================
 # GRÁFICO
 # =======================
 graf = (
     alt.Chart(comparativo)
-    .mark_bar(size=40)
+    .mark_bar(size=35)
     .encode(
         x=alt.X(
-            "nomeCredor:N",
-            title="Credor",
-            sort="-y"
-        ),
-        xOffset=alt.XOffset(
             "Ano:N",
             title="Exercício"
+        ),
+        xOffset=alt.XOffset(
+            "nomeCredor:N",
+            title="Credor"
         ),
         y=alt.Y(
             "valorEmpenhadoBruto_num:Q",
             title="Valor Empenhado (R$)"
         ),
         color=alt.Color(
-            "Ano:N",
-            title="Exercício"
+            "nomeCredor:N",
+            title="Credor"
         ),
         tooltip=[
             "Ano:N",
@@ -106,16 +91,15 @@ graf = (
     .properties(height=420)
 )
 
-st.altair_chart(graf, use_container_width=True)
+st.subheader("📊 Detalhamento por Exercício e Credor")
 
-# =======================
-# TABELA ABAIXO DO GRÁFICO
-# =======================
-comparativo_display_format = comparativo_display.copy()
+tabela = comparativo.copy()
 
-for col in ["Empenhado Bruto", "Empenhado Anulado", "Baixado Bruto"]:
-    comparativo_display_format[col] = comparativo_display_format[col].apply(
-        lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    )
+tabela["Valor Empenhado"] = tabela["valorEmpenhadoBruto_num"].apply(
+    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
 
-st.dataframe(comparativo_display_format, use_container_width=True)
+tabela = tabela[["Ano", "nomeCredor", "Valor Empenhado"]]
+
+st.dataframe(tabela, use_container_width=True)
+
