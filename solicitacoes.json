@@ -1,0 +1,20 @@
+{
+    "julio": {
+        "email": "cesar",
+        "senha": "julio123",
+        "perfil": "USER",
+        "status": "aprovado"
+    },
+    "Cesar": {
+        "email": "@ba",
+        "senha": "cesar123",
+        "perfil": "USER",
+        "status": "aprovado"
+    },
+    "Viol": {
+        "email": "bora",
+        "senha": "1236",
+        "perfil": "USER",
+        "status": "rejeitado"
+    }
+}
