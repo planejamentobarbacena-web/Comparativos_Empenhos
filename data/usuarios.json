@@ -1,22 +1,17 @@
 {
-    "Admin": {
-        "senha": "1234",
-        "perfil": "ADMIN",
-        "status": "ativo"
-    },
-    "Julio": {
-        "senha": "senha",
-        "perfil": "USER",
-        "status": "ativo"
-    },
-        "Tamara": {
-        "senha": "12345",
-        "perfil": "USER",
-        "status": "ativo"
-    },
-    "Cesar": {
-        "senha": "cesar123",
-        "perfil": "USER",
-        "status": "ativo"
-    }
+  "Admin": {
+    "senha": "1234",
+    "perfil": "ADMIN",
+    "status": "ativo"
+  },
+  "Julio": {
+    "senha": "senha",
+    "perfil": "USER",
+    "status": "ativo"
+  },
+  "Tamara": {
+    "senha": "12345",
+    "perfil": "USER",
+    "status": "ativo"
+  }
 }
