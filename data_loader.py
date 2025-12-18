@@ -8,10 +8,9 @@ def load_empenhos():
 
     pasta = Path("data")
 
-    arquivos = sorted(
-        list(pasta.glob("*_empenhos.csv")) +
-        list(pasta.glob("*_empenhos.xlsx"))
-    )
+    arquivos = list(pasta.glob("*_empenhos.csv"))
+    arquivos += list(pasta.glob("*_empenhos.xlsx"))
+    arquivos = sorted(arquivos)
 
     if not arquivos:
         return pd.DataFrame()
@@ -21,12 +20,8 @@ def load_empenhos():
     for arq in arquivos:
         df = None
 
-        # =====================
-        # CSV
-        # =====================
         if arq.suffix.lower() == ".csv":
-            encodings = ["utf-8", "utf-8-sig", "latin1"]
-            for enc in encodings:
+            for enc in ["utf-8", "utf-8-sig", "latin1"]:
                 try:
                     df = pd.read_csv(
                         arq,
@@ -41,12 +36,9 @@ def load_empenhos():
                     continue
 
             if df is None:
-                st.warning(f"Não foi possível ler {arq.name}")
+                st.warning(f"Erro ao ler {arq.name}")
                 continue
 
-        # =====================
-        # XLSX
-        # =====================
         elif arq.suffix.lower() == ".xlsx":
             try:
                 df = pd.read_excel(arq, dtype=str)
@@ -54,11 +46,7 @@ def load_empenhos():
                 st.warning(f"Erro ao ler {arq.name}: {e}")
                 continue
 
-        # =====================
-        # ANO
-        # =====================
         df["Ano"] = arq.stem.split("_")[0]
-
         dfs.append(df)
 
     if not dfs:
@@ -66,16 +54,13 @@ def load_empenhos():
 
     df = pd.concat(dfs, ignore_index=True)
 
-    # =====================
-    # CAMPOS NUMÉRICOS
-    # =====================
-    mapping = {
+    campos = {
         "valorEmpenhadoBruto": "valorEmpenhadoBruto_num",
         "valorEmpenhadoAnulado": "valorEmpenhadoAnulado_num",
         "valorBaixadoBruto": "valorBaixadoBruto_num"
     }
 
-    for origem, destino in mapping.items():
+    for origem, destino in campos.items():
         if origem in df.columns:
             df[destino] = (
                 df[origem]
@@ -89,9 +74,6 @@ def load_empenhos():
 
     df["Valor"] = df["valorEmpenhadoBruto_num"]
 
-    # =====================
-    # LIMPEZA
-    # =====================
     for col in ["nomeCredor", "numRecurso", "numNaturezaEmp"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
