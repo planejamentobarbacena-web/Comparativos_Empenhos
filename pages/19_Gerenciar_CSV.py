@@ -33,5 +33,5 @@ st.divider()
 
 st.info(
     "📌 **Observação:** o envio e a exclusão de arquivos CSV "
-    "devem ser realizados exclusivamente pela página **18_Upload**."
+    "devem ser realizados exclusivamente pela página **Atualizar CSV**."
 )
