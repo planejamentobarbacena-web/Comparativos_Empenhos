@@ -51,14 +51,12 @@ else:
     df_sel = df.copy()
 
 
-# Agrupamento por Ano
 comparativo = (
     df_sel
-    .groupby("Ano", as_index=False)[
-        ["valorEmpenhadoBruto_num", "valorEmpenhadoAnulado_num", "valorBaixadoBruto_num"]
-    ]
+    .groupby(["Ano", "nomeCredor"], as_index=False)["valorEmpenhadoBruto_num"]
     .sum()
 )
+
 
 # Renomear colunas para exibição
 comparativo_display = comparativo.rename(columns={
@@ -79,25 +77,21 @@ df_melt["Tipo"] = df_melt["Tipo"].map({
 # GRÁFICO
 # =======================
 graf = (
-    alt.Chart(df_melt)
-    .mark_bar(size=45)
+    alt.Chart(comparativo)
+    .mark_bar(size=40)
     .encode(
         x=alt.X(
-            "Tipo:N",
-            title="Tipo de Valor",
-            axis=alt.Axis(labelAngle=0)
+            "nomeCredor:N",
+            title="Credor",
+            sort="-y"
         ),
         xOffset=alt.XOffset(
             "Ano:N",
-            scale=alt.Scale(
-                paddingInner=0.1,
-                paddingOuter=0.1
-            ),
             title="Exercício"
         ),
         y=alt.Y(
-            "Valor:Q",
-            title="Valor (R$)"
+            "valorEmpenhadoBruto_num:Q",
+            title="Valor Empenhado (R$)"
         ),
         color=alt.Color(
             "Ano:N",
@@ -105,8 +99,8 @@ graf = (
         ),
         tooltip=[
             "Ano:N",
-            "Tipo:N",
-            alt.Tooltip("Valor:Q", format=",.2f")
+            "nomeCredor:N",
+            alt.Tooltip("valorEmpenhadoBruto_num:Q", format=",.2f")
         ]
     )
     .properties(height=420)
