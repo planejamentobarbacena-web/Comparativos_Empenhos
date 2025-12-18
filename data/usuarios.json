@@ -18,10 +18,5 @@
     "senha": "abcdef",
     "perfil": "USER",
     "status": "ativo"
-  },
-  "Joao Silva": {
-    "senha": "123456",
-    "perfil": "USER",
-    "status": "ativo"
   }
 }
