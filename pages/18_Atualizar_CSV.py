@@ -20,7 +20,7 @@ if st.session_state.get("arquivos_atualizados"):
 # =========================
 # UPLOAD
 # =========================
-arquivo = st.file_uploader("Selecione um CSV", type=["csv", "xlsx"]
+arquivo = st.file_uploader("Selecione um CSV", type=("csv"))
 
 if arquivo is not None:
     if st.button("Enviar Arquivo"):
