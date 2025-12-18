@@ -5,7 +5,7 @@ import altair as alt
 
 from auth import login, exige_admin
 from components.header import render_header
-from data_loader import load_empenhos_xlsx
+from data_loader import load_empenhos
 
 # 🔐 Segurança
 login()
@@ -15,7 +15,7 @@ st.title("📁 Consulta por Credor")
 
 # Carregar dados
 # Carregar dados
-df = load_empenhos_xlsx()
+df = load_empenhos()
 if df.empty:
     st.warning("Nenhum dado carregado.")
     st.stop()
