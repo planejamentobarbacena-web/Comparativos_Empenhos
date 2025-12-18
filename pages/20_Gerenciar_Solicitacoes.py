@@ -14,8 +14,10 @@ st.title("👥 Gerenciar Solicitações de Acesso")
 # ----------------------------
 # Caminhos dos arquivos JSON
 # ----------------------------
-file_solic = os.path.join("data", "solicitacoes.json")
-file_users = os.path.join("data", "usuarios.json")
+data_dir = "data"
+os.makedirs(data_dir, exist_ok=True)  # garante que a pasta exista
+file_solic = os.path.join(data_dir, "solicitacoes.json")
+file_users = os.path.join(data_dir, "usuarios.json")
 
 # ----------------------------
 # Funções utilitárias
@@ -38,20 +40,25 @@ def sanitize_key(s):
     return "".join(c for c in s if c.isalnum() or c == "_")
 
 def aprovar_usuario(nome, perfil):
+    # Adiciona ao usuarios.json
     usuarios[nome] = {
         "senha": solicitacoes[nome]["senha"],
         "perfil": perfil,
         "status": "ativo"
     }
+    # Atualiza a solicitação
     solicitacoes[nome]["status"] = "aprovado"
+
     salvar_json(file_users, usuarios)
     salvar_json(file_solic, solicitacoes)
     st.success(f"✅ {nome} aprovado como {perfil}")
+    st.session_state["reload"] = True
 
 def rejeitar_usuario(nome):
     solicitacoes[nome]["status"] = "rejeitado"
     salvar_json(file_solic, solicitacoes)
     st.warning(f"❌ Solicitação de {nome} rejeitada.")
+    st.session_state["reload"] = True
 
 # ----------------------------
 # Carregar dados
@@ -59,8 +66,8 @@ def rejeitar_usuario(nome):
 solicitacoes = carregar_json(file_solic)
 usuarios = carregar_json(file_users)
 
-# Filtrar pendentes (case-insensitive)
-pendentes = {k: v for k, v in solicitacoes.items() if v.get("status", "").lower() == "pendente"}
+# Filtrar pendentes
+pendentes = {k: v for k, v in solicitacoes.items() if v.get("status") == "pendente"}
 
 if not pendentes:
     st.info("📭 Nenhum cadastro solicitado no momento.")
@@ -85,8 +92,13 @@ for nome, info in pendentes.items():
 
     if col1.button(f"✅ Aprovar {nome}", key=f"aprovar_{key_base}"):
         aprovar_usuario(nome, perfil_escolhido)
-        st.experimental_rerun()
 
     if col2.button(f"❌ Rejeitar {nome}", key=f"rejeitar_{key_base}"):
         rejeitar_usuario(nome)
-        st.experimental_rerun()
+
+# ----------------------------
+# Recarrega o app se necessário
+# ----------------------------
+if st.session_state.get("reload"):
+    del st.session_state["reload"]
+    st.experimental_rerun()
