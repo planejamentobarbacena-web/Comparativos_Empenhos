@@ -167,10 +167,12 @@ st.altair_chart(graf, use_container_width=True)
 # ==========================
 cols = [
     "numeroEmpenho",
-    "anoEmpenho",
+    "Ano",
     "especificacao",
     "data",
-    "valorEmpenhadoLiquido",
+    "valorEmpenhadoBruto",
+    "valorEmpenhadoAnulado",
+    "valor_liquido",
     "nomeCredor",
     "Descrição da despesa",
     "Descrição da natureza",
@@ -179,11 +181,10 @@ cols = [
 
 tabela = df_filtro[cols].copy()
 
-tabela["valorEmpenhadoLiquido"] = tabela[
-    "valorEmpenhadoLiquido"
-].apply(
-    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
+for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "valor_liquido"]:
+    tabela[col] = tabela[col].apply(
+        lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    )
 
 st.subheader("📋 Empenhos encontrados")
 st.dataframe(tabela, use_container_width=True)
