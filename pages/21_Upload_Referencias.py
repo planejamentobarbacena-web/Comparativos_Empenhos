@@ -86,8 +86,7 @@ if arquivo is not None and st.button("📤 Enviar Arquivo"):
         # ------------------------
         if sucesso_github:
             st.success(
-                f"✅ Arquivo '{arquivo.name}' enviado com sucesso!\n\n"
-                f"📄 {len(df)} linhas x {len(df.columns)} colunas."
+                f"✅ Arquivo '{arquivo.name}' enviado com sucesso!"
             )
             st.dataframe(df.head())
         else:
@@ -100,3 +99,4 @@ if arquivo is not None and st.button("📤 Enviar Arquivo"):
 
     except Exception as e:
         st.error(f"❌ Erro no upload: {e}")
+
