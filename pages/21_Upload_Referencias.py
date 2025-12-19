@@ -87,5 +87,7 @@ if not st.session_state["arquivo_enviado"]:
 
 else:
     st.info("📌 Arquivo já enviado. Para enviar outro, atualize a página ou clique abaixo.")
-           st.experimental_rerun()
+    if st.button("📂 Enviar novo arquivo"):
+        st.session_state["arquivo_enviado"] = False
+        st.experimental_rerun()
 
