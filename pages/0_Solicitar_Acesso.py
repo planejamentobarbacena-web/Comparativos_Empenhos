@@ -10,8 +10,17 @@ st.title("📝 Solicitar Acesso ao Sistema")
 # Inputs do usuário
 # ----------------------------
 nome = st.text_input("Nome de usuário")
-email = st.text_input("E-mail")
-senha = st.text_input("Senha", type="password")
+
+senha = st.text_input(
+    "Senha",
+    type="password",
+    help="Sistema hospedado em ambiente público. Cadastre uma senha exclusiva, que não seja utilizada em sistemas pessoais ou institucionais."
+)
+
+st.caption(
+    "🔒 Sistema hospedado em ambiente público. "
+    "Cadastre uma senha exclusiva, que não seja utilizada em sistemas pessoais ou institucionais."
+)
 
 # ----------------------------
 # Configuração GitHub
@@ -49,7 +58,11 @@ def salvar_github(dados, caminho, mensagem):
         "sha": sha_atual,
         "branch": BRANCH
     }
-    r = requests.put(f"https://api.github.com/repos/{REPO}/contents/{caminho}", json=payload, headers=HEADERS)
+    r = requests.put(
+        f"https://api.github.com/repos/{REPO}/contents/{caminho}",
+        json=payload,
+        headers=HEADERS
+    )
     if r.status_code not in (200, 201):
         st.error(r.json())
         st.stop()
@@ -58,7 +71,7 @@ def salvar_github(dados, caminho, mensagem):
 # Botão de envio
 # ----------------------------
 if st.button("📨 Enviar solicitação"):
-    if not nome or not email or not senha:
+    if not nome or not senha:
         st.error("Preencha todos os campos!")
         st.stop()
 
@@ -69,7 +82,6 @@ if st.button("📨 Enviar solicitação"):
         st.stop()
 
     solicitacoes[nome] = {
-        "email": email,
         "senha": senha,
         "perfil": "USER",
         "status": "pendente"
