@@ -92,11 +92,10 @@ if arquivo is not None and st.button("📤 Enviar Arquivo"):
         else:
             st.warning("Arquivo salvo localmente, mas não foi possível enviar para o GitHub.")
 
-        # ------------------------
-        # Limpa uploader para evitar reenvio
-        # ------------------------
-        st.experimental_rerun()
-
+    
     except Exception as e:
         st.error(f"❌ Erro no upload: {e}")
+        
+        st.experimental_rerun()
+
 
