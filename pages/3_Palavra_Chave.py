@@ -22,9 +22,16 @@ st.title("🔎 Empenhos por Palavra-Chave")
 # ==========================
 df = load_empenhos()
 if df.empty:
-    st.warning("Nenhum dado encontrado.")
+    st.warning("Nenhum dado carregado.")
     st.stop()
 
+# 🔹 Limpeza definitiva de Exercício e Entidade
+df["anoEmpenho"] = (
+    df["anoEmpenho"]
+    .astype(str)
+    .str.strip()
+    .replace(["nan", "None", ""], pd.NA)
+)
 # ==========================
 # TRATAMENTO DE VALORES (CORREÇÃO DO ERRO)
 # ==========================
