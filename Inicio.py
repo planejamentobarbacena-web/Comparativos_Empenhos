@@ -1,18 +1,12 @@
 import streamlit as st
-import os
-import json
 import altair as alt
 
-from auth import login, exige_admin
+from auth import login
 from components.header import render_header
 from data_loader import load_empenhos  
 
-# 🔐 Segurança
-login()
-render_header()
-
 # ======================================================
-# CONFIGURAÇÃO GERAL (apenas o necessário)
+# CONFIGURAÇÃO DA PÁGINA
 # ======================================================
 st.set_page_config(
     page_title="Painel de Empenhos",
@@ -20,15 +14,14 @@ st.set_page_config(
     layout="wide"
 )
 
-# --------------------------
-# Autenticação (bloqueia se não logado)
-# --------------------------
+# ======================================================
+# SEGURANÇA
+# ======================================================
 login()
-# botão de logout disponível na sidebar
-
+render_header()
 
 # ======================================================
-# CSS (visual estilo app)
+# CSS (opcional)
 # ======================================================
 def load_css():
     try:
@@ -40,13 +33,21 @@ def load_css():
 load_css()
 
 # ======================================================
-# CARREGAMENTO DOS DADOS (ÚNICA FONTE)
+# CARREGAMENTO DOS DADOS
 # ======================================================
 df = load_empenhos()
 
 if df.empty:
     st.warning("Nenhum arquivo encontrado na pasta /data.")
     st.stop()
+
+# ======================================================
+# TRATAMENTO PARA FILTROS (remove NaN)
+# ======================================================
+df = df.copy()
+
+df["Ano"] = df["Ano"].dropna()
+df["entidade"] = df["entidade"].fillna("")
 
 # ======================================================
 # TÍTULO
@@ -61,7 +62,7 @@ st.markdown(
 )
 
 # ======================================================
-# MÉTRICAS GERAIS
+# MÉTRICAS GERAIS (sempre totais)
 # ======================================================
 total_empenhado = df["valorEmpenhadoBruto_num"].sum()
 total_anulado   = df["valorEmpenhadoAnulado_num"].sum()
@@ -85,14 +86,44 @@ col3.metric(
 )
 
 # ======================================================
-# GRÁFICO CONSOLIDADO POR ANO (EMPENHADO)
+# FILTROS SIMPLES (ENTRE MÉTRICAS E GRÁFICO)
+# ======================================================
+st.markdown("---")
+
+col_f1, col_f2 = st.columns(2)
+
+with col_f1:
+    exercicios = sorted(df["Ano"].dropna().unique())
+    filtro_exercicio = st.selectbox(
+        "📅 Exercício",
+        options=["Todos"] + exercicios
+    )
+
+with col_f2:
+    entidades = sorted(df["entidade"].unique())
+    filtro_entidade = st.selectbox(
+        "🏛️ Entidade",
+        options=["Todas"] + entidades
+    )
+
+# ======================================================
+# APLICA FILTROS
+# ======================================================
+df_filtrado = df.copy()
+
+if filtro_exercicio != "Todos":
+    df_filtrado = df_filtrado[df_filtrado["Ano"] == filtro_exercicio]
+
+if filtro_entidade != "Todas":
+    df_filtrado = df_filtrado[df_filtrado["entidade"] == filtro_entidade]
+
+# ======================================================
+# GRÁFICO CONSOLIDADO
 # ======================================================
 st.markdown("### 📊 Empenhado × Anulado × Baixado por Exercício")
 
-base_grafico = df.copy()
-
 graf = (
-    alt.Chart(df)
+    alt.Chart(df_filtrado)
     .transform_fold(
         [
             "valorEmpenhadoBruto_num",
@@ -108,7 +139,7 @@ graf = (
             'Baixado'
         """
     )
-    .mark_bar(size=45)   # 👈 barras - largura
+    .mark_bar(size=45)
     .encode(
         x=alt.X(
             "TipoLabel:N",
@@ -117,10 +148,7 @@ graf = (
         ),
         xOffset=alt.XOffset(
             "Ano:N",
-            scale=alt.Scale(
-                paddingInner=0.05,   # 👈 barras bem próximas
-                paddingOuter=0.05
-            ),
+            scale=alt.Scale(paddingInner=0.05, paddingOuter=0.05),
             title="Exercício"
         ),
         y=alt.Y(
@@ -142,11 +170,9 @@ graf = (
 
 st.altair_chart(graf, use_container_width=True)
 
-
 # ======================================================
 # TABELA RESUMIDA
 # ======================================================
-# Seleciona e formata colunas de valores como moeda brasileira
 cols_tabela = [
     "Ano",
     "numeroEmpenho",
@@ -158,28 +184,30 @@ cols_tabela = [
     "valorBaixadoBruto_num"
 ]
 
-df_tabela = df[cols_tabela].copy()
+df_tabela = df_filtrado[cols_tabela].copy()
 
-# Formata os valores monetários
-for col in ["valorEmpenhadoBruto_num", "valorEmpenhadoAnulado_num", "valorBaixadoBruto_num"]:
+for col in [
+    "valorEmpenhadoBruto_num",
+    "valorEmpenhadoAnulado_num",
+    "valorBaixadoBruto_num"
+]:
     df_tabela[col] = df_tabela[col].apply(
         lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     )
 
-# Exibe a tabela abaixo do gráfico
 with st.expander("📋 Ver dados carregados (amostra)"):
     st.dataframe(df_tabela.head(50), use_container_width=True)
 
 # ======================================================
-# EXPORTAÇÃO CSV
+# EXPORTAÇÃO
 # ======================================================
 st.markdown("### ⬇️ Exportar dados")
 
-csv = df.to_csv(index=False, sep=";").encode("utf-8")
+csv = df_filtrado.to_csv(index=False, sep=";").encode("utf-8")
 
 st.download_button(
-    label="📥 Baixar CSV completo",
+    label="📥 Baixar CSV filtrado",
     data=csv,
-    file_name="empenhos_tratados.csv",
+    file_name="empenhos_filtrados.csv",
     mime="text/csv"
 )
