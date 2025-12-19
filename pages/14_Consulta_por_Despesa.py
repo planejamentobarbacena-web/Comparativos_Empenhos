@@ -36,6 +36,17 @@ anos_sel = st.multiselect(
 df = df[df["Ano"].isin(anos_sel)]
 
 # =======================
+# FILTRO POR ENTIDADE
+# =======================
+entidades = sorted(df["nomeEntidade"].dropna().unique())
+entidades_sel = st.multiselect(
+    "🏢 Selecione a(s) Entidade(s)",
+    entidades
+)
+if entidades_sel:
+    df = df[df["nomeEntidade"].isin(entidades_sel)]
+
+# =======================
 # FILTRO POR DESPESA
 # =======================
 despesas = sorted(df["numDespesa"].dropna().unique())
@@ -61,7 +72,7 @@ if naturezas_sel:
 # AGRUPAMENTO PARA GRÁFICO
 # =======================
 comparativo = (
-    df.groupby(["Ano","numDespesa","numNaturezaEmp"], as_index=False)["valorEmpenhadoBruto_num"]
+    df.groupby(["Ano","nomeEntidade","numDespesa","numNaturezaEmp"], as_index=False)["valorEmpenhadoBruto_num"]
     .sum()
 )
 
@@ -82,6 +93,7 @@ graf = (
         color=alt.Color("numNaturezaEmp:N", title="Natureza"),
         tooltip=[
             "Ano:N",
+            "nomeEntidade:N",
             "numDespesa:N",
             "numNaturezaEmp:N",
             alt.Tooltip("valorEmpenhadoBruto_num:Q", format=",.2f")
@@ -99,7 +111,7 @@ tabela = comparativo.copy()
 tabela["Valor Empenhado"] = tabela["valorEmpenhadoBruto_num"].apply(
     lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
-tabela = tabela[["Ano","numDespesa","numNaturezaEmp","Valor Empenhado"]]
+tabela = tabela[["Ano","nomeEntidade","numDespesa","numNaturezaEmp","Valor Empenhado"]]
 st.dataframe(tabela, use_container_width=True)
 
 # =======================
@@ -107,6 +119,7 @@ st.dataframe(tabela, use_container_width=True)
 # =======================
 csv_bytes = comparativo.rename(columns={
     "Ano":"Exercício",
+    "nomeEntidade":"Entidade",
     "numDespesa":"Despesa",
     "numNaturezaEmp":"Natureza",
     "valorEmpenhadoBruto_num":"Valor Empenhado"
