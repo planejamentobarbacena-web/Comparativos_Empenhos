@@ -1,9 +1,8 @@
 import streamlit as st
-import os
-import json
 import altair as alt
+import pandas as pd
 
-from auth import login, exige_admin
+from auth import login
 from components.header import render_header
 from data_loader import load_empenhos
 
@@ -11,103 +10,179 @@ from data_loader import load_empenhos
 login()
 render_header()
 
+st.set_page_config(
+    page_title="📁 Consulta por Credor",
+    layout="wide"
+)
+
 st.title("📁 Consulta por Credor")
 
-# Carregar dados
-# Carregar dados
+# ==========================
+# CARREGAR DADOS
+# ==========================
 df = load_empenhos()
 if df.empty:
     st.warning("Nenhum dado carregado.")
     st.stop()
 
-# =======================
-# FILTRO POR EXERCÍCIO
-# =======================
-anos_disponiveis = sorted(df["Ano"].unique())
+# ==========================
+# TRATAMENTO DE VALORES
+# ==========================
+for col in [
+    "valorEmpenhadoBruto",
+    "valorEmpenhadoAnulado",
+    "saldoBaixado"
+]:
+    df[col] = (
+        df[col]
+        .astype(str)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
+    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-anos_selecionados = st.multiselect(
-    "📅 Selecione o(s) Exercício(s)",
-    anos_disponiveis,
-    default=anos_disponiveis  # começa com todos
+df["valorEmpenhadoLiquido"] = (
+    df["valorEmpenhadoBruto"] - df["valorEmpenhadoAnulado"]
 )
 
-if anos_selecionados:
-    df = df[df["Ano"].isin(anos_selecionados)]
+# ==========================
+# FILTRO – EXERCÍCIO
+# ==========================
+anos = sorted(df["anoEmpenho"].dropna().unique())
 
-
-# =======================
-# FILTRO POR CREDOR
-# =======================
-lista_credores = sorted(df["nomeCredor"].dropna().unique())
-
-credores_selecionados = st.multiselect(
-    "🏢 Selecione o(s) Credor(es)",
-    lista_credores
+anos_sel = st.multiselect(
+    "📅 Exercício",
+    anos,
+    default=anos
 )
 
-if credores_selecionados:
-    df_sel = df[df["nomeCredor"].isin(credores_selecionados)]
-else:
-    df_sel = df.copy()
+df = df[df["anoEmpenho"].isin(anos_sel)]
 
+# ==========================
+# FILTRO – ENTIDADE
+# ==========================
+entidades = sorted(df["nomeEntidade"].dropna().unique())
 
+entidades_sel = st.multiselect(
+    "🏢 Entidade",
+    entidades,
+    default=entidades
+)
+
+df = df[df["nomeEntidade"].isin(entidades_sel)]
+
+# ==========================
+# FILTRO – CREDOR
+# ==========================
+credores = ["Todos"] + sorted(df["nomeCredor"].dropna().unique())
+
+credor_sel = st.multiselect(
+    "👤 Credor",
+    credores,
+    default=["Todos"]
+)
+
+if "Todos" not in credor_sel:
+    df = df[df["nomeCredor"].isin(credor_sel)]
+
+# ==========================
+# FILTRO – DESCRIÇÃO DA DESPESA
+# ==========================
+despesas = ["Todos"] + sorted(df["Descrição da despesa"].dropna().unique())
+
+despesa_sel = st.multiselect(
+    "📂 Descrição da Despesa",
+    despesas,
+    default=["Todos"]
+)
+
+if "Todos" not in despesa_sel:
+    df = df[df["Descrição da despesa"].isin(despesa_sel)]
+
+# ==========================
+# AGRUPAMENTO PARA GRÁFICO
+# ==========================
 comparativo = (
-    df_sel
-    .groupby(["Ano", "nomeCredor"], as_index=False)["valorEmpenhadoBruto_num"]
-    .sum()
+    df
+    .groupby("anoEmpenho", as_index=False)
+    .agg({
+        "valorEmpenhadoLiquido": "sum",
+        "saldoBaixado": "sum"
+    })
 )
 
-# =======================
-# GRÁFICO
-# =======================
+comparativo_melt = comparativo.melt(
+    id_vars="anoEmpenho",
+    value_vars=[
+        "valorEmpenhadoLiquido",
+        "saldoBaixado"
+    ],
+    var_name="Tipo",
+    value_name="Valor"
+)
+
+comparativo_melt["Tipo"] = comparativo_melt["Tipo"].map({
+    "valorEmpenhadoLiquido": "Empenhado Líquido",
+    "saldoBaixado": "Saldo Baixado"
+})
+
+# ==========================
+# GRÁFICO (DUAS BARRAS)
+# ==========================
 graf = (
-    alt.Chart(comparativo)
-    .mark_bar(size=35)
+    alt.Chart(comparativo_melt)
+    .mark_bar(size=40)
     .encode(
-        x=alt.X(
-            "Ano:N",
-            title="Exercício"
-        ),
-        xOffset=alt.XOffset(
-            "nomeCredor:N",
-            title="Credor"
-        ),
-        y=alt.Y(
-            "valorEmpenhadoBruto_num:Q",
-            title="Valor Empenhado (R$)"
-        ),
-        color=alt.Color(
-            "nomeCredor:N",
-            title="Credor"
-        ),
+        x=alt.X("anoEmpenho:N", title="Exercício"),
+        xOffset=alt.XOffset("Tipo:N"),
+        y=alt.Y("Valor:Q", title="Valor (R$)"),
+        color=alt.Color("Tipo:N", title="Tipo"),
         tooltip=[
-            "Ano:N",
-            "nomeCredor:N",
-            alt.Tooltip("valorEmpenhadoBruto_num:Q", format=",.2f")
+            "anoEmpenho:N",
+            "Tipo:N",
+            alt.Tooltip("Valor:Q", format=",.2f")
         ]
     )
     .properties(height=420)
 )
+
 st.altair_chart(graf, use_container_width=True)
 
-st.subheader("📊 Detalhamento por Exercício e Credor")
+# ==========================
+# TABELA DETALHADA
+# ==========================
+tabela = df[[
+    "numeroEmpenho",
+    "anoEmpenho",
+    "nomeEntidade",
+    "nomeCredor",
+    "Descrição da despesa",
+    "valorEmpenhadoBruto",
+    "valorEmpenhadoAnulado",
+    "valorEmpenhadoLiquido",
+    "saldoBaixado"
+]].copy()
 
-tabela = comparativo.copy()
+for col in [
+    "valorEmpenhadoBruto",
+    "valorEmpenhadoAnulado",
+    "valorEmpenhadoLiquido",
+    "saldoBaixado"
+]:
+    tabela[col] = tabela[col].apply(
+        lambda x: f"R$ {x:,.2f}"
+        .replace(",", "X")
+        .replace(".", ",")
+        .replace("X", ".")
+    )
 
-tabela["Valor Empenhado"] = tabela["valorEmpenhadoBruto_num"].apply(
-    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
-# DOWNLOAD CSV (FILTRADO)
-# =======================
-st.divider()
+st.subheader("📋 Detalhamento dos Empenhos")
+st.dataframe(tabela, use_container_width=True)
 
-csv_download = comparativo.rename(columns={
-    "Ano": "Exercício",
-    "nomeCredor": "Credor",
-    "valorEmpenhadoBruto_num": "Valor Empenhado"
-})
-
-csv_bytes = csv_download.to_csv(
+# ==========================
+# DOWNLOAD CSV
+# ==========================
+csv = df.to_csv(
     index=False,
     sep=";",
     decimal=",",
@@ -115,13 +190,8 @@ csv_bytes = csv_download.to_csv(
 )
 
 st.download_button(
-    label="📥 Baixar CSV dos dados filtrados",
-    data=csv_bytes,
-    file_name="consulta_por_credor_filtrada.csv",
+    "⬇️ Baixar CSV – Consulta por Credor",
+    csv,
+    file_name="consulta_por_credor.csv",
     mime="text/csv"
 )
-
-tabela = tabela[["Ano", "nomeCredor", "Valor Empenhado"]]
-
-st.dataframe(tabela, use_container_width=True)
-
