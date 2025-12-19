@@ -2,6 +2,13 @@ import streamlit as st
 import os
 import shutil
 import pandas as pd
+from auth import login, exige_admin
+from components.header import render_header
+
+# 🔐 Segurança
+login()
+render_header()
+exige_admin()
 
 st.set_page_config(
     page_title="📤 Upload de Referências",
@@ -41,3 +48,4 @@ if arquivo is not None:
 
         except Exception as e:
             st.error(f"❌ Erro no upload: {e}")
+
