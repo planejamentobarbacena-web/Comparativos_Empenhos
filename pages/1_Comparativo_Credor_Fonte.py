@@ -80,17 +80,6 @@ barras = (
     )
 )
 
-linha = (
-    alt.Chart(linha_totais)
-    .mark_line(color="black", size=2)
-    .encode(
-        x=alt.X("Ano:N"),
-        xOffset=alt.XOffset("Tipo:N", scale=alt.Scale(paddingInner=0.1)),
-        y=alt.Y("Montante:Q"),
-        detail="Tipo:N"
-    )
-)
-
 labels = (
     alt.Chart(linha_totais)
     .mark_text(dy=-5, fontWeight="bold", fontSize=11)
