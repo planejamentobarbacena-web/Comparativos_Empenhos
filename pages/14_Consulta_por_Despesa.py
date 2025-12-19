@@ -20,13 +20,23 @@ if df.empty:
     st.warning("Nenhum dado carregado.")
     st.stop()
 
-# 🔹 Limpeza de linhas inválidas para filtros
-df = df[
-    df["anoEmpenho"].notna() &
-    df["nomeEntidade"].notna() &
-    (df["anoEmpenho"].astype(str).str.strip() != "") &
-    (df["nomeEntidade"].astype(str).str.strip() != "")
-]
+# 🔹 Limpeza definitiva de Exercício e Entidade
+df["anoEmpenho"] = (
+    df["anoEmpenho"]
+    .astype(str)
+    .str.strip()
+    .replace(["nan", "None", ""], pd.NA)
+)
+
+df["nomeEntidade"] = (
+    df["nomeEntidade"]
+    .astype(str)
+    .str.strip()
+    .replace(["nan", "None", ""], pd.NA)
+)
+
+df = df.dropna(subset=["anoEmpenho", "nomeEntidade"])
+
 
 # =======================
 # TRATAMENTO DE VALORES
