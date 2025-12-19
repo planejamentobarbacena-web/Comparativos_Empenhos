@@ -1,5 +1,6 @@
 import streamlit as st
 import altair as alt
+import pandas as pd
 import unicodedata
 from auth import login
 from components.header import render_header
