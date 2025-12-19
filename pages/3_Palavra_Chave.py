@@ -32,6 +32,16 @@ df["anoEmpenho"] = (
     .str.strip()
     .replace(["nan", "None", ""], pd.NA)
 )
+
+df["nomeEntidade"] = (
+    df["nomeEntidade"]
+    .astype(str)
+    .str.strip()
+    .replace(["nan", "None", ""], pd.NA)
+)
+
+df = df.dropna(subset=["anoEmpenho", "nomeEntidade"])
+
 # ==========================
 # TRATAMENTO DE VALORES (CORREÇÃO DO ERRO)
 # ==========================
