@@ -2,7 +2,6 @@ import streamlit as st
 import altair as alt
 import unicodedata
 import pandas as pd
-
 from auth import login
 from components.header import render_header
 from data_loader import load_empenhos
@@ -22,31 +21,25 @@ st.title("🔎 Empenhos por Palavra-Chave")
 # CARREGAR DADOS
 # ==========================
 df = load_empenhos()
-
 if df.empty:
     st.warning("Nenhum dado encontrado.")
     st.stop()
 
 # ==========================
-# AJUSTE DE TIPOS NUMÉRICOS
+# TRATAMENTO DE VALORES (CORREÇÃO DO ERRO)
 # ==========================
-for col in [
-    "valorEmpenhadoBruto",
-    "valorEmpenhadoAnulado"
-]:
+for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado"]:
+    df[col] = (
+        df[col]
+        .astype(str)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-# ==========================
-# VALOR LÍQUIDO OFICIAL
-# ==========================
-df["valor_liquido"] = (
+df["valorEmpenhadoLiquido"] = (
     df["valorEmpenhadoBruto"] - df["valorEmpenhadoAnulado"]
 )
-
-# ==========================
-# PADRONIZA ANO
-# ==========================
-df["anoEmpenho"] = df["anoEmpenho"].astype(str)
 
 # ==========================
 # FILTROS GLOBAIS
@@ -54,14 +47,25 @@ df["anoEmpenho"] = df["anoEmpenho"].astype(str)
 anos = sorted(df["anoEmpenho"].dropna().unique())
 entidades = sorted(df["nomeEntidade"].dropna().unique())
 
-anos_sel = st.multiselect("📅 Selecione Exercício(s)", anos, default=anos)
-entidades_sel = st.multiselect("🏢 Selecione Entidade(s)", entidades, default=entidades)
+anos_sel = st.multiselect(
+    "📅 Selecione Exercício(s)",
+    anos,
+    default=anos
+)
 
-df = df[df["anoEmpenho"].isin(anos_sel)]
-df = df[df["nomeEntidade"].isin(entidades_sel)]
+entidades_sel = st.multiselect(
+    "🏢 Selecione Entidade(s)",
+    entidades,
+    default=entidades
+)
+
+df = df[
+    df["anoEmpenho"].isin(anos_sel) &
+    df["nomeEntidade"].isin(entidades_sel)
+]
 
 # ==========================
-# NORMALIZAÇÃO DE TEXTO
+# Normalização de texto
 # ==========================
 def normalize_text(texto: str) -> str:
     if not texto:
@@ -84,7 +88,7 @@ df["especificacao_norm"] = (
 )
 
 # ==========================
-# PALAVRA-CHAVE (PRIMEIRO FILTRO)
+# Palavra-chave
 # ==========================
 palavra = st.text_input(
     "🔍 Palavra-chave para busca",
@@ -106,31 +110,35 @@ if df_filtro.empty:
     st.stop()
 
 # ==========================
-# FILTRO POR NÚMERO DE DESPESA
+# Filtro por Descrição da Despesa
 # ==========================
-despesas = ["Todos"] + sorted(df_filtro["numDespesa"].dropna().astype(str).unique())
+despesas = ["Todos"] + sorted(
+    df_filtro["Descrição da despesa"].dropna().unique()
+)
 
-despesas_sel = st.multiselect(
-    "📂 Selecione Número(s) de Despesa",
+despesa_sel = st.multiselect(
+    "📂 Filtro – Descrição da Despesa",
     despesas,
     default=["Todos"]
 )
 
-if "Todos" not in despesas_sel:
-    df_filtro = df_filtro[df_filtro["numDespesa"].astype(str).isin(despesas_sel)]
+if "Todos" not in despesa_sel:
+    df_filtro = df_filtro[
+        df_filtro["Descrição da despesa"].isin(despesa_sel)
+    ]
 
 # ==========================
-# MÉTRICA (VALOR LÍQUIDO)
+# Métrica
 # ==========================
-total = df_filtro["valor_liquido"].sum()
+total = df_filtro["valorEmpenhadoLiquido"].sum()
 
 st.metric(
-    "💰 Total Empenhado Líquido (Palavra-Chave)",
+    "💰 Total Empenhado Líquido",
     f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
 
 # ==========================
-# GRÁFICO POR EXERCÍCIO (LÍQUIDO)
+# Gráfico (sem linhas)
 # ==========================
 graf = (
     alt.Chart(df_filtro)
@@ -138,12 +146,15 @@ graf = (
     .encode(
         x=alt.X("anoEmpenho:N", title="Exercício"),
         y=alt.Y(
-            "sum(valor_liquido):Q",
+            "sum(valorEmpenhadoLiquido):Q",
             title="Valor Empenhado Líquido (R$)"
         ),
         tooltip=[
             "anoEmpenho:N",
-            alt.Tooltip("sum(valor_liquido):Q", format=",.2f")
+            alt.Tooltip(
+                "sum(valorEmpenhadoLiquido):Q",
+                format=",.2f"
+            )
         ]
     )
     .properties(height=420)
@@ -152,43 +163,35 @@ graf = (
 st.altair_chart(graf, use_container_width=True)
 
 # ==========================
-# TABELA DETALHADA
+# Tabela
 # ==========================
-st.subheader("📋 Empenhos encontrados")
-
 cols = [
     "numeroEmpenho",
     "anoEmpenho",
-    "nomeEntidade",
     "especificacao",
+    "data",
+    "valorEmpenhadoLiquido",
+    "nomeCredor",
     "Descrição da despesa",
     "Descrição da natureza",
-    "valorEmpenhadoBruto",
-    "valorEmpenhadoAnulado",
-    "valor_liquido",
-    "nomeCredor"
+    "numRecurso"
 ]
 
 tabela = df_filtro[cols].copy()
 
-for col in [
-    "valorEmpenhadoBruto",
-    "valorEmpenhadoAnulado",
-    "valor_liquido"
-]:
-    tabela[col] = tabela[col].apply(
-        lambda x: f"R$ {x:,.2f}"
-        .replace(",", "X")
-        .replace(".", ",")
-        .replace("X", ".")
-    )
+tabela["valorEmpenhadoLiquido"] = tabela[
+    "valorEmpenhadoLiquido"
+].apply(
+    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
 
+st.subheader("📋 Empenhos encontrados")
 st.dataframe(tabela, use_container_width=True)
 
 # ==========================
-# DOWNLOAD CSV
+# Download
 # ==========================
-csv = tabela.to_csv(index=False, sep=";", encoding="utf-8-sig")
+csv = tabela.to_csv(index=False, sep=";", encoding="utf-8")
 
 st.download_button(
     "⬇️ Baixar CSV – Palavra-Chave",
