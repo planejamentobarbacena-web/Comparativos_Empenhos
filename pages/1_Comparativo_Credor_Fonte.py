@@ -55,14 +55,9 @@ df_melt["Tipo"] = df_melt["Tipo"].map({
 })
 
 # =======================
-# Totais para linha centralizada
+# Gráfico: apenas barras empilhadas
 # =======================
-linha_totais = df_melt.groupby(["Ano", "Tipo"], as_index=False)["Montante"].sum()
-
-# =======================
-# Gráfico: barras + linha + labels
-# =======================
-barras = (
+graf = (
     alt.Chart(df_melt)
     .mark_bar()
     .encode(
@@ -78,20 +73,9 @@ barras = (
             alt.Tooltip("Montante:Q", format=",.2f")
         ]
     )
+    .properties(height=450)
 )
 
-labels = (
-    alt.Chart(linha_totais)
-    .mark_text(dy=-5, fontWeight="bold", fontSize=11)
-    .encode(
-        x=alt.X("Ano:N"),
-        xOffset=alt.XOffset("Tipo:N", scale=alt.Scale(paddingInner=0.1)),
-        y=alt.Y("Montante:Q"),
-        text=alt.Text("Tipo:N")
-    )
-)
-
-graf = alt.layer(barras, linha, labels).properties(height=450)
 st.altair_chart(graf, use_container_width=True)
 
 # =======================
