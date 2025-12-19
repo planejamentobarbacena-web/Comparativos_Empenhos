@@ -13,5 +13,11 @@
     "senha": "12345",
     "perfil": "USER",
     "status": "ativo"
+  },
+    "Valeria": {
+    "email": "a@",
+    "senha": "123456",
+    "perfil": "USER",
+    "status": "pendente"
   }
 }
