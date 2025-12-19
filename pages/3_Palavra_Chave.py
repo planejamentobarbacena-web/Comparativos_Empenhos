@@ -29,15 +29,12 @@ if df.empty:
 # ==========================
 anos = sorted(df["Ano"].dropna().unique())
 entidades = sorted(df["nomeEntidade"].dropna().unique())
-despesas = sorted(df["numDespesa"].dropna().unique())
 
 anos_sel = st.multiselect("📅 Selecione Exercício(s)", anos, default=anos)
 entidades_sel = st.multiselect("🏢 Selecione Entidade(s)", entidades, default=entidades)
-despesas_sel = st.multiselect("📂 Selecione Número(s) de Despesa", despesas, default=despesas)
 
 df = df[df["Ano"].isin(anos_sel)]
 df = df[df["nomeEntidade"].isin(entidades_sel)]
-df = df[df["numDespesa"].isin(despesas_sel)]
 
 # ==========================
 # Normalização de texto
@@ -58,7 +55,7 @@ def singularize(word: str) -> str:
 df["especificacao_norm"] = df["especificacao"].astype(str).apply(normalize_text).apply(singularize)
 
 # ==========================
-# Campo de busca
+# Campo de busca (palavra-chave)
 # ==========================
 palavra = st.text_input("🔍 Palavra-chave para busca", placeholder="Ex: sonho de natal")
 if not palavra:
@@ -71,6 +68,15 @@ df_filtro = df[df["especificacao_norm"].str.contains(palavra_norm, na=False)].co
 if df_filtro.empty:
     st.warning("Nenhum empenho encontrado com essa palavra.")
     st.stop()
+
+# ==========================
+# Filtro por Número de Despesa
+# ==========================
+despesas = ["Todos"] + sorted(df_filtro["numDespesa"].dropna().unique())
+despesas_sel = st.multiselect("📂 Selecione Número(s) de Despesa", despesas, default=["Todos"])
+
+if "Todos" not in despesas_sel:
+    df_filtro = df_filtro[df_filtro["numDespesa"].isin(despesas_sel)]
 
 # ==========================
 # Métrica rápida
