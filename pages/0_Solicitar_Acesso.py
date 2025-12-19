@@ -17,9 +17,20 @@ senha = st.text_input(
     help="Sistema hospedado em ambiente público. Cadastre uma senha exclusiva, que não seja utilizada em sistemas pessoais ou institucionais."
 )
 
-st.caption(
-    "🔒 Sistema hospedado em ambiente público. "
-    "Cadastre uma senha exclusiva, que não seja utilizada em sistemas pessoais ou institucionais."
+st.markdown(
+    """
+    <div style="
+        font-size: 16px;
+        font-weight: 600;
+        color: #333333;
+        margin-top: -5px;
+        margin-bottom: 15px;
+    ">
+        🔒 Sistema hospedado em ambiente público. 
+        Cadastre uma senha exclusiva, que não seja utilizada em sistemas pessoais ou institucionais.
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 # ----------------------------
