@@ -29,12 +29,15 @@ if df.empty:
 # ==========================
 anos = sorted(df["Ano"].dropna().unique())
 entidades = sorted(df["nomeEntidade"].dropna().unique())
+despesas = sorted(df["numDespesa"].dropna().unique())
 
 anos_sel = st.multiselect("📅 Selecione Exercício(s)", anos, default=anos)
 entidades_sel = st.multiselect("🏢 Selecione Entidade(s)", entidades, default=entidades)
+despesas_sel = st.multiselect("📂 Selecione Número(s) de Despesa", despesas, default=despesas)
 
 df = df[df["Ano"].isin(anos_sel)]
 df = df[df["nomeEntidade"].isin(entidades_sel)]
+df = df[df["numDespesa"].isin(despesas_sel)]
 
 # ==========================
 # Normalização de texto
