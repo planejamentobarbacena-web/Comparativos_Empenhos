@@ -1,7 +1,8 @@
 import streamlit as st
 import altair as alt
-import pandas as pd
 import unicodedata
+import pandas as pd
+
 from auth import login
 from components.header import render_header
 from data_loader import load_empenhos
@@ -26,20 +27,13 @@ if df.empty:
     st.stop()
 
 # ==========================
-# TRATAMENTO DE VALORES (CORREÇÃO DO ERRO)
+# AJUSTE DE TIPOS NUMÉRICOS
 # ==========================
 for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado"]:
-    df[col] = (
-        df[col]
-        .astype(str)
-        .str.replace(".", "", regex=False)
-        .str.replace(",", ".", regex=False)
-    )
     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-df["valorEmpenhadoLiquido"] = (
-    df["valorEmpenhadoBruto"] - df["valorEmpenhadoAnulado"]
-)
+# Valor líquido
+df["valor_liquido"] = df["valorEmpenhadoBruto"] - df["valorEmpenhadoAnulado"]
 
 # ==========================
 # FILTROS GLOBAIS
@@ -59,13 +53,11 @@ entidades_sel = st.multiselect(
     default=entidades
 )
 
-df = df[
-    df["anoEmpenho"].isin(anos_sel) &
-    df["nomeEntidade"].isin(entidades_sel)
-]
+df = df[df["anoEmpenho"].isin(anos_sel)]
+df = df[df["nomeEntidade"].isin(entidades_sel)]
 
 # ==========================
-# Normalização de texto
+# NORMALIZAÇÃO DE TEXTO
 # ==========================
 def normalize_text(texto: str) -> str:
     if not texto:
@@ -88,7 +80,7 @@ df["especificacao_norm"] = (
 )
 
 # ==========================
-# Palavra-chave
+# PALAVRA-CHAVE (PRIMEIRO FILTRO)
 # ==========================
 palavra = st.text_input(
     "🔍 Palavra-chave para busca",
@@ -110,14 +102,14 @@ if df_filtro.empty:
     st.stop()
 
 # ==========================
-# Filtro por Descrição da Despesa
+# FILTRO POR DESPESA (DEPOIS DA PALAVRA)
 # ==========================
 despesas = ["Todos"] + sorted(
     df_filtro["Descrição da despesa"].dropna().unique()
 )
 
 despesa_sel = st.multiselect(
-    "📂 Filtro – Descrição da Despesa",
+    "📂 Selecione Descrição da Despesa",
     despesas,
     default=["Todos"]
 )
@@ -128,17 +120,20 @@ if "Todos" not in despesa_sel:
     ]
 
 # ==========================
-# Métrica
+# MÉTRICA RÁPIDA (VALOR LÍQUIDO)
 # ==========================
-total = df_filtro["valorEmpenhadoLiquido"].sum()
+total = df_filtro["valor_liquido"].sum()
 
 st.metric(
-    "💰 Total Empenhado Líquido",
-    f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    "💰 Total Empenhado Líquido (Palavra-Chave)",
+    f"R$ {total:,.2f}"
+    .replace(",", "X")
+    .replace(".", ",")
+    .replace("X", ".")
 )
 
 # ==========================
-# Gráfico (sem linhas)
+# GRÁFICO POR EXERCÍCIO (LÍQUIDO)
 # ==========================
 graf = (
     alt.Chart(df_filtro)
@@ -146,13 +141,13 @@ graf = (
     .encode(
         x=alt.X("anoEmpenho:N", title="Exercício"),
         y=alt.Y(
-            "sum(valorEmpenhadoLiquido):Q",
+            "sum(valor_liquido):Q",
             title="Valor Empenhado Líquido (R$)"
         ),
         tooltip=[
             "anoEmpenho:N",
             alt.Tooltip(
-                "sum(valorEmpenhadoLiquido):Q",
+                "sum(valor_liquido):Q",
                 format=",.2f"
             )
         ]
@@ -163,7 +158,7 @@ graf = (
 st.altair_chart(graf, use_container_width=True)
 
 # ==========================
-# Tabela
+# TABELA DETALHADA
 # ==========================
 cols = [
     "numeroEmpenho",
@@ -182,18 +177,30 @@ cols = [
 
 tabela = df_filtro[cols].copy()
 
-for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "valor_liquido"]:
+# Formatação monetária
+for col in [
+    "valorEmpenhadoBruto",
+    "valorEmpenhadoAnulado",
+    "valor_liquido"
+]:
     tabela[col] = tabela[col].apply(
-        lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        lambda x: f"R$ {x:,.2f}"
+        .replace(",", "X")
+        .replace(".", ",")
+        .replace("X", ".")
     )
 
 st.subheader("📋 Empenhos encontrados")
 st.dataframe(tabela, use_container_width=True)
 
 # ==========================
-# Download
+# DOWNLOAD CSV
 # ==========================
-csv = tabela.to_csv(index=False, sep=";", encoding="utf-8")
+csv = tabela.to_csv(
+    index=False,
+    sep=";",
+    encoding="utf-8-sig"
+)
 
 st.download_button(
     "⬇️ Baixar CSV – Palavra-Chave",
