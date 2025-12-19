@@ -22,6 +22,7 @@ st.title("🔎 Empenhos por Palavra-Chave")
 # CARREGAR DADOS
 # ==========================
 df = load_empenhos()
+
 if df.empty:
     st.warning("Nenhum dado encontrado.")
     st.stop()
@@ -29,11 +30,23 @@ if df.empty:
 # ==========================
 # AJUSTE DE TIPOS NUMÉRICOS
 # ==========================
-for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado"]:
+for col in [
+    "valorEmpenhadoBruto",
+    "valorEmpenhadoAnulado"
+]:
     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-# Valor líquido
-df["valor_liquido"] = df["valorEmpenhadoBruto"] - df["valorEmpenhadoAnulado"]
+# ==========================
+# VALOR LÍQUIDO OFICIAL
+# ==========================
+df["valor_liquido"] = (
+    df["valorEmpenhadoBruto"] - df["valorEmpenhadoAnulado"]
+)
+
+# ==========================
+# PADRONIZA ANO
+# ==========================
+df["anoEmpenho"] = df["anoEmpenho"].astype(str)
 
 # ==========================
 # FILTROS GLOBAIS
@@ -41,17 +54,8 @@ df["valor_liquido"] = df["valorEmpenhadoBruto"] - df["valorEmpenhadoAnulado"]
 anos = sorted(df["anoEmpenho"].dropna().unique())
 entidades = sorted(df["nomeEntidade"].dropna().unique())
 
-anos_sel = st.multiselect(
-    "📅 Selecione Exercício(s)",
-    anos,
-    default=anos
-)
-
-entidades_sel = st.multiselect(
-    "🏢 Selecione Entidade(s)",
-    entidades,
-    default=entidades
-)
+anos_sel = st.multiselect("📅 Selecione Exercício(s)", anos, default=anos)
+entidades_sel = st.multiselect("🏢 Selecione Entidade(s)", entidades, default=entidades)
 
 df = df[df["anoEmpenho"].isin(anos_sel)]
 df = df[df["nomeEntidade"].isin(entidades_sel)]
@@ -102,34 +106,27 @@ if df_filtro.empty:
     st.stop()
 
 # ==========================
-# FILTRO POR DESPESA (DEPOIS DA PALAVRA)
+# FILTRO POR NÚMERO DE DESPESA
 # ==========================
-despesas = ["Todos"] + sorted(
-    df_filtro["Descrição da despesa"].dropna().unique()
-)
+despesas = ["Todos"] + sorted(df_filtro["numDespesa"].dropna().astype(str).unique())
 
-despesa_sel = st.multiselect(
-    "📂 Selecione Descrição da Despesa",
+despesas_sel = st.multiselect(
+    "📂 Selecione Número(s) de Despesa",
     despesas,
     default=["Todos"]
 )
 
-if "Todos" not in despesa_sel:
-    df_filtro = df_filtro[
-        df_filtro["Descrição da despesa"].isin(despesa_sel)
-    ]
+if "Todos" not in despesas_sel:
+    df_filtro = df_filtro[df_filtro["numDespesa"].astype(str).isin(despesas_sel)]
 
 # ==========================
-# MÉTRICA RÁPIDA (VALOR LÍQUIDO)
+# MÉTRICA (VALOR LÍQUIDO)
 # ==========================
 total = df_filtro["valor_liquido"].sum()
 
 st.metric(
     "💰 Total Empenhado Líquido (Palavra-Chave)",
-    f"R$ {total:,.2f}"
-    .replace(",", "X")
-    .replace(".", ",")
-    .replace("X", ".")
+    f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
 
 # ==========================
@@ -146,10 +143,7 @@ graf = (
         ),
         tooltip=[
             "anoEmpenho:N",
-            alt.Tooltip(
-                "sum(valor_liquido):Q",
-                format=",.2f"
-            )
+            alt.Tooltip("sum(valor_liquido):Q", format=",.2f")
         ]
     )
     .properties(height=420)
@@ -160,24 +154,23 @@ st.altair_chart(graf, use_container_width=True)
 # ==========================
 # TABELA DETALHADA
 # ==========================
+st.subheader("📋 Empenhos encontrados")
+
 cols = [
     "numeroEmpenho",
     "anoEmpenho",
     "nomeEntidade",
     "especificacao",
-    "data",
     "Descrição da despesa",
     "Descrição da natureza",
     "valorEmpenhadoBruto",
     "valorEmpenhadoAnulado",
     "valor_liquido",
-    "nomeCredor",
-    "numRecurso"
+    "nomeCredor"
 ]
 
 tabela = df_filtro[cols].copy()
 
-# Formatação monetária
 for col in [
     "valorEmpenhadoBruto",
     "valorEmpenhadoAnulado",
@@ -190,17 +183,12 @@ for col in [
         .replace("X", ".")
     )
 
-st.subheader("📋 Empenhos encontrados")
 st.dataframe(tabela, use_container_width=True)
 
 # ==========================
 # DOWNLOAD CSV
 # ==========================
-csv = tabela.to_csv(
-    index=False,
-    sep=";",
-    encoding="utf-8-sig"
-)
+csv = tabela.to_csv(index=False, sep=";", encoding="utf-8-sig")
 
 st.download_button(
     "⬇️ Baixar CSV – Palavra-Chave",
