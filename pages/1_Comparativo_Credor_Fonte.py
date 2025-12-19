@@ -1,133 +1,116 @@
 import streamlit as st
-import os
-import json
 import altair as alt
-
-from auth import login, exige_admin
+from auth import login
 from components.header import render_header
-from data_loader import load_empenhos  
+from data_loader import load_empenhos
 
 # 🔐 Segurança
 login()
 render_header()
 
 st.set_page_config(
-    page_title="Comparativo Exercício x Tipo",
-    page_icon="💰",
+    page_title="📂 Comparativo por Credor",
     layout="wide"
 )
 
-st.title("💰 Comparativo: Credor x Fonte de Recurso")
+st.title("📂 Comparativo por Credor")
 
-# Carregar dados
+# =======================
+# CARREGAR DADOS
+# =======================
 df = load_empenhos()
 if df.empty:
-    st.warning("Nenhum dado carregado.")
+    st.info("Nenhum dado encontrado.")
     st.stop()
 
-# Filtro opcional de credor
-credor = st.selectbox(
-    "Selecione o Credor:",
-    ["Todos"] + sorted(df["nomeCredor"].dropna().unique())
+# =======================
+# FILTROS GLOBAIS
+# =======================
+anos = sorted(df["Ano"].dropna().unique())
+entidades = sorted(df["nomeEntidade"].dropna().unique())
+
+anos_sel = st.multiselect("📅 Selecione Exercício(s)", anos, default=anos)
+entidades_sel = st.multiselect("🏢 Selecione Entidade(s)", entidades, default=entidades)
+
+df = df[df["Ano"].isin(anos_sel)]
+df = df[df["nomeEntidade"].isin(entidades_sel)]
+
+# =======================
+# FILTRO POR DESPESA
+# =======================
+despesas = sorted(df["numDespesa"].dropna().unique())
+despesas_sel = st.multiselect("📂 Selecione a(s) Despesa(s)", despesas)
+if despesas_sel:
+    df = df[df["numDespesa"].isin(despesas_sel)]
+
+# =======================
+# FILTRO POR NATUREZA
+# =======================
+naturezas = sorted(df["numNaturezaEmp"].dropna().unique())
+naturezas_sel = st.multiselect("📂 Selecione a(s) Natureza(s)", naturezas)
+if naturezas_sel:
+    df = df[df["numNaturezaEmp"].isin(naturezas_sel)]
+
+# =======================
+# AGRUPAMENTO PARA GRÁFICO
+# =======================
+comparativo = (
+    df.groupby(["Ano","nomeEntidade","numDespesa","numNaturezaEmp"], as_index=False)["valorEmpenhadoBruto_num"]
+    .sum()
 )
 
-df_sel = df.copy()
-if credor != "Todos":
-    df_sel = df_sel[df_sel["nomeCredor"] == credor]
+if comparativo.empty:
+    st.info("Nenhum dado encontrado com os filtros selecionados.")
+    st.stop()
 
-# Melt dos dados
-df_melt = df_sel.melt(
-    id_vars=["Ano", "numRecurso"],
-    value_vars=["valorEmpenhadoBruto_num", "valorEmpenhadoAnulado_num", "valorBaixadoBruto_num"],
-    var_name="Tipo",
-    value_name="Montante"
-)
-
-# Mapear nomes amigáveis
-df_melt["Tipo"] = df_melt["Tipo"].map({
-    "valorEmpenhadoBruto_num": "Empenhado Bruto",
-    "valorEmpenhadoAnulado_num": "Empenhado Anulado",
-    "valorBaixadoBruto_num": "Baixado Bruto"
-})
-
-# ==========================
-# Calcular total por Tipo + Ano para a linha centralizada
-# ==========================
-linha_totais = df_melt.groupby(["Ano", "Tipo"], as_index=False)["Montante"].sum()
-
-# ==========================
-# Gráfico de barras empilhadas
-# ==========================
-barras = (
-    alt.Chart(df_melt)
-    .mark_bar()
+# =======================
+# GRÁFICO
+# =======================
+graf = (
+    alt.Chart(comparativo)
+    .mark_bar(size=35)
     .encode(
         x=alt.X("Ano:N", title="Exercício"),
-        xOffset=alt.XOffset("Tipo:N", scale=alt.Scale(paddingInner=0.1)),
-        y=alt.Y("Montante:Q", title="Valor (R$)"),
-        color=alt.Color("numRecurso:N", title="Fonte de Recurso", scale=alt.Scale(scheme='category20')),
+        xOffset=alt.XOffset("numDespesa:N"),
+        y=alt.Y("valorEmpenhadoBruto_num:Q", title="Valor Empenhado (R$)"),
+        color=alt.Color("numNaturezaEmp:N", title="Natureza"),
         tooltip=[
             "Ano:N",
-            "Tipo:N",
-            "numRecurso:N",
-            alt.Tooltip("Montante:Q", format=",.2f")
+            "nomeEntidade:N",
+            "numDespesa:N",
+            "numNaturezaEmp:N",
+            alt.Tooltip("valorEmpenhadoBruto_num:Q", format=",.2f")
         ]
     )
+    .properties(height=420)
 )
-
-# ==========================
-# Linha centralizada no topo de cada barra
-# ==========================
-linha = (
-    alt.Chart(linha_totais)
-    .mark_line(color="black", size=2)
-    .encode(
-        x=alt.X("Ano:N"),
-        xOffset=alt.XOffset("Tipo:N", scale=alt.Scale(paddingInner=0.1)),  # centraliza sobre cada barra
-        y=alt.Y("Montante:Q"),
-        detail="Tipo:N"  # linha por Tipo
-    )
-)
-
-# ==========================
-# Labels ao lado de cada barra
-# ==========================
-labels = (
-    alt.Chart(linha_totais)
-    .mark_text(dy=-5, fontWeight="bold", fontSize=11)
-    .encode(
-        x=alt.X("Ano:N"),
-        xOffset=alt.XOffset("Tipo:N", scale=alt.Scale(paddingInner=0.1)),
-        y=alt.Y("Montante:Q"),
-        text=alt.Text("Tipo:N")
-    )
-)
-
-# ==========================
-# Layer: barras + linha + labels
-# ==========================
-graf = alt.layer(barras, labels).properties(height=450)
-
 st.altair_chart(graf, use_container_width=True)
 
-# ======================================
-# Tabela abaixo do gráfico
-# ======================================
-comparativo = df_sel.groupby(["Ano", "numRecurso"], as_index=False)[
-    ["valorEmpenhadoBruto_num", "valorEmpenhadoAnulado_num", "valorBaixadoBruto_num"]
-].sum()
+# =======================
+# TABELA DETALHADA
+# =======================
+st.subheader("📄 Dados Detalhados")
+tabela = comparativo.copy()
+tabela["Valor Empenhado"] = tabela["valorEmpenhadoBruto_num"].apply(
+    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+tabela = tabela[["Ano","nomeEntidade","numDespesa","numNaturezaEmp","Valor Empenhado"]]
+st.dataframe(tabela, use_container_width=True)
 
-comparativo_display = comparativo.rename(columns={
-    "valorEmpenhadoBruto_num": "Empenhado Bruto",
-    "valorEmpenhadoAnulado_num": "Empenhado Anulado",
-    "valorBaixadoBruto_num": "Baixado Bruto"
-})
+# =======================
+# DOWNLOAD CSV
+# =======================
+csv_bytes = comparativo.rename(columns={
+    "Ano":"Exercício",
+    "nomeEntidade":"Entidade",
+    "numDespesa":"Despesa",
+    "numNaturezaEmp":"Natureza",
+    "valorEmpenhadoBruto_num":"Valor Empenhado"
+}).to_csv(index=False, sep=";", decimal=",", encoding="utf-8-sig")
 
-# Formatar valores em R$
-for col in ["Empenhado Bruto", "Empenhado Anulado", "Baixado Bruto"]:
-    comparativo_display[col] = comparativo_display[col].apply(
-        lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    )
-
-st.subheader("📋 Tabela de valores por Exercício e Fonte")
-st.dataframe(comparativo_display, use_container_width=True)
+st.download_button(
+    "📥 Baixar CSV dos dados filtrados",
+    csv_bytes,
+    file_name="comparativo_credor_filtrado.csv",
+    mime="text/csv"
+)
