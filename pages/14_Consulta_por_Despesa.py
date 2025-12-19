@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+import os
 from auth import login
 from components.header import render_header
 from data_loader import load_empenhos
@@ -27,9 +28,11 @@ if df.empty:
 # =======================
 # CARREGAR REFERÊNCIAS
 # =======================
+referencias_files = [f for f in os.listdir("data") if f.endswith("_referencias.xlsx")]
+
 referencias_file = st.selectbox(
     "Selecione o arquivo de referências",
-    options=[f for f in st.listdir("data") if f.endswith("_referencias.xlsx")]
+    options=referencias_files
 )
 
 referencias = pd.read_excel(f"data/{referencias_file}")
