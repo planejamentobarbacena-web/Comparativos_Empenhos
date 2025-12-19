@@ -4,5 +4,10 @@
     "senha": "123456",
     "perfil": "USER",
     "status": "aprovado"
+  },
+  "Julio": {
+    "senha": "123654",
+    "perfil": "USER",
+    "status": "pendente"
   }
 }
