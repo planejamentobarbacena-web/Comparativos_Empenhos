@@ -25,9 +25,18 @@ if df.empty:
     st.stop()
 
 # ==========================
-# AJUSTE DE VALOR (BRUTO - ANULADO)
+# TRATAMENTO DE VALORES (CORREÇÃO DO ERRO)
 # ==========================
-df["valor_liquido"] = (
+for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado"]:
+    df[col] = (
+        df[col]
+        .astype(str)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
+    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+df["valorEmpenhadoLiquido"] = (
     df["valorEmpenhadoBruto"] - df["valorEmpenhadoAnulado"]
 )
 
@@ -49,8 +58,10 @@ entidades_sel = st.multiselect(
     default=entidades
 )
 
-df = df[df["anoEmpenho"].isin(anos_sel)]
-df = df[df["nomeEntidade"].isin(entidades_sel)]
+df = df[
+    df["anoEmpenho"].isin(anos_sel) &
+    df["nomeEntidade"].isin(entidades_sel)
+]
 
 # ==========================
 # Normalização de texto
@@ -60,9 +71,7 @@ def normalize_text(texto: str) -> str:
         return ""
     texto = texto.upper()
     texto = unicodedata.normalize("NFD", texto)
-    texto = "".join(
-        c for c in texto if unicodedata.category(c) != "Mn"
-    )
+    texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")
     return texto
 
 def singularize(word: str) -> str:
@@ -78,7 +87,7 @@ df["especificacao_norm"] = (
 )
 
 # ==========================
-# Campo de busca (palavra-chave)
+# Palavra-chave
 # ==========================
 palavra = st.text_input(
     "🔍 Palavra-chave para busca",
@@ -100,38 +109,35 @@ if df_filtro.empty:
     st.stop()
 
 # ==========================
-# Filtro por DESCRIÇÃO DA DESPESA
+# Filtro por Descrição da Despesa
 # ==========================
 despesas = ["Todos"] + sorted(
     df_filtro["Descrição da despesa"].dropna().unique()
 )
 
-despesas_sel = st.multiselect(
-    "📂 Selecione a Despesa",
+despesa_sel = st.multiselect(
+    "📂 Filtro – Descrição da Despesa",
     despesas,
     default=["Todos"]
 )
 
-if "Todos" not in despesas_sel:
+if "Todos" not in despesa_sel:
     df_filtro = df_filtro[
-        df_filtro["Descrição da despesa"].isin(despesas_sel)
+        df_filtro["Descrição da despesa"].isin(despesa_sel)
     ]
 
 # ==========================
-# MÉTRICA
+# Métrica
 # ==========================
-total = df_filtro["valor_liquido"].sum()
+total = df_filtro["valorEmpenhadoLiquido"].sum()
 
 st.metric(
-    "💰 Total Empenhado (líquido)",
-    f"R$ {total:,.2f}"
-        .replace(",", "X")
-        .replace(".", ",")
-        .replace("X", ".")
+    "💰 Total Empenhado Líquido",
+    f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
 
 # ==========================
-# GRÁFICO POR EXERCÍCIO
+# Gráfico (sem linhas)
 # ==========================
 graf = (
     alt.Chart(df_filtro)
@@ -139,13 +145,13 @@ graf = (
     .encode(
         x=alt.X("anoEmpenho:N", title="Exercício"),
         y=alt.Y(
-            "sum(valor_liquido):Q",
+            "sum(valorEmpenhadoLiquido):Q",
             title="Valor Empenhado Líquido (R$)"
         ),
         tooltip=[
             "anoEmpenho:N",
             alt.Tooltip(
-                "sum(valor_liquido):Q",
+                "sum(valorEmpenhadoLiquido):Q",
                 format=",.2f"
             )
         ]
@@ -156,51 +162,39 @@ graf = (
 st.altair_chart(graf, use_container_width=True)
 
 # ==========================
-# TABELA DETALHADA
+# Tabela
 # ==========================
-st.subheader("📋 Empenhos encontrados")
-
 cols = [
     "numeroEmpenho",
     "anoEmpenho",
-    "nomeEntidade",
     "especificacao",
     "data",
+    "valorEmpenhadoLiquido",
+    "nomeCredor",
     "Descrição da despesa",
     "Descrição da natureza",
-    "nomeCredor",
-    "numRecurso",
-    "valor_liquido"
+    "numRecurso"
 ]
 
 tabela = df_filtro[cols].copy()
 
-tabela["valor_liquido"] = tabela["valor_liquido"].apply(
-    lambda x: f"R$ {x:,.2f}"
-        .replace(",", "X")
-        .replace(".", ",")
-        .replace("X", ".")
+tabela["valorEmpenhadoLiquido"] = tabela[
+    "valorEmpenhadoLiquido"
+].apply(
+    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
 
-tabela = tabela.rename(columns={
-    "anoEmpenho": "Exercício",
-    "valor_liquido": "Valor Empenhado Líquido"
-})
-
+st.subheader("📋 Empenhos encontrados")
 st.dataframe(tabela, use_container_width=True)
 
 # ==========================
-# DOWNLOAD CSV
+# Download
 # ==========================
-csv = tabela.to_csv(
-    index=False,
-    sep=";",
-    encoding="utf-8-sig"
-)
+csv = tabela.to_csv(index=False, sep=";", encoding="utf-8")
 
 st.download_button(
     "⬇️ Baixar CSV – Palavra-Chave",
     csv,
-    file_name=f"empenhos_palavra_chave_{palavra.replace(' ','_')}.csv",
+    file_name=f"empenhos_palavra_chave_{palavra.replace(' ', '_')}.csv",
     mime="text/csv"
 )
