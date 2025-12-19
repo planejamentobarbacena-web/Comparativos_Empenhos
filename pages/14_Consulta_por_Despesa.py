@@ -81,16 +81,16 @@ if comparativo.empty:
     st.stop()
 
 # =======================
-# GRÁFICO COM ENTIDADES DIFERENCIADAS
+# GRÁFICO
 # =======================
 graf = (
     alt.Chart(comparativo)
-    .mark_bar(size=30)
+    .mark_bar(size=35)
     .encode(
         x=alt.X("Ano:N", title="Exercício"),
         xOffset=alt.XOffset("numDespesa:N"),
         y=alt.Y("valorEmpenhadoBruto_num:Q", title="Valor Empenhado (R$)"),
-        color=alt.Color("nomeEntidade:N", title="Entidade"),
+        color=alt.Color("numNaturezaEmp:N", title="Natureza"),
         tooltip=[
             "Ano:N",
             "nomeEntidade:N",
@@ -99,7 +99,7 @@ graf = (
             alt.Tooltip("valorEmpenhadoBruto_num:Q", format=",.2f")
         ]
     )
-    .properties(height=450)
+    .properties(height=420)
 )
 st.altair_chart(graf, use_container_width=True)
 
@@ -135,3 +135,4 @@ st.download_button(
     file_name="consulta_por_despesa_filtrada.csv",
     mime="text/csv"
 )
+
