@@ -167,15 +167,16 @@ st.altair_chart(graf, use_container_width=True)
 # ==========================
 cols = [
     "numeroEmpenho",
-    "Ano",
+    "anoEmpenho",
+    "nomeEntidade",
     "especificacao",
     "data",
+    "Descrição da despesa",
+    "Descrição da natureza",
     "valorEmpenhadoBruto",
     "valorEmpenhadoAnulado",
     "valor_liquido",
     "nomeCredor",
-    "Descrição da despesa",
-    "Descrição da natureza",
     "numRecurso"
 ]
 
