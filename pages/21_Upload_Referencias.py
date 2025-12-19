@@ -28,8 +28,7 @@ HEADERS = {
 # Pasta local
 # ----------------------------
 DATA_DIR = os.path.join(os.getcwd(), "data")
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # ----------------------------
 # Funções GitHub
@@ -58,44 +57,36 @@ def salvar_github(nome_arquivo, conteudo_bytes, mensagem):
     return True
 
 # ----------------------------
-# Upload do arquivo
+# Controle de envio
 # ----------------------------
-arquivo = st.file_uploader("Selecione o arquivo XLSX", type=["xlsx"])
+if "arquivo_enviado" not in st.session_state:
+    st.session_state["arquivo_enviado"] = False
 
-if arquivo is not None and st.button("📤 Enviar Arquivo"):
-    try:
-        # ------------------------
-        # Salva local
-        # ------------------------
-        destino = os.path.join(DATA_DIR, arquivo.name)
-        with open(destino, "wb") as f:
-            f.write(arquivo.getbuffer())
+if not st.session_state["arquivo_enviado"]:
+    arquivo = st.file_uploader("Selecione o arquivo XLSX", type=["xlsx"])
+    if arquivo is not None and st.button("📤 Enviar Arquivo"):
+        try:
+            destino = os.path.join(DATA_DIR, arquivo.name)
+            with open(destino, "wb") as f:
+                f.write(arquivo.getbuffer())
 
-        # ------------------------
-        # Salva no GitHub
-        # ------------------------
-        sucesso_github = salvar_github(arquivo.name, arquivo.getvalue(), f"Upload {arquivo.name}")
+            sucesso_github = salvar_github(arquivo.name, arquivo.getvalue(), f"Upload {arquivo.name}")
 
-        # ------------------------
-        # Teste rápido de leitura
-        # ------------------------
-        df = pd.read_excel(destino)
+            df = pd.read_excel(destino)
 
-        # ------------------------
-        # Mensagem única combinada
-        # ------------------------
-        if sucesso_github:
-            st.success(
-                f"✅ Arquivo '{arquivo.name}' enviado com sucesso!"
-            )
+            if sucesso_github:
+                st.success(f"✅ Arquivo '{arquivo.name}' enviado com sucesso!")
+            else:
+                st.warning("Arquivo salvo localmente, mas não foi possível enviar para o GitHub.")
+
             st.dataframe(df.head())
-        else:
-            st.warning("Arquivo salvo localmente, mas não foi possível enviar para o GitHub.")
+            st.session_state["arquivo_enviado"] = True
 
-    
-    except Exception as e:
-        st.error(f"❌ Erro no upload: {e}")
-        
+        except Exception as e:
+            st.error(f"❌ Erro no upload: {e}")
+
+else:
+    st.info("📌 Arquivo já enviado. Para enviar outro, atualize a página ou clique abaixo.")
+    if st.button("📂 Enviar novo arquivo"):
+        st.session_state["arquivo_enviado"] = False
         st.experimental_rerun()
-
-
