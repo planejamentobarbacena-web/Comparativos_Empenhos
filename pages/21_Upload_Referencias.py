@@ -38,7 +38,6 @@ def salvar_github(nome_arquivo, conteudo_bytes, mensagem):
     caminho_repo = f"{PASTA}/{nome_arquivo}"
     url = f"https://api.github.com/repos/{REPO}/contents/{caminho_repo}"
 
-    # Verificar se já existe para obter SHA
     r = requests.get(url, headers=HEADERS)
     sha = r.json()["sha"] if r.status_code == 200 else None
 
@@ -49,43 +48,55 @@ def salvar_github(nome_arquivo, conteudo_bytes, mensagem):
         "content": conteudo_b64,
         "branch": BRANCH
     }
-
     if sha:
         data["sha"] = sha
 
     r = requests.put(url, headers=HEADERS, json=data)
     if r.status_code not in (200, 201):
         st.error(f"❌ Erro ao enviar para GitHub: {r.json()}")
-    else:
-        st.success(f"✅ Arquivo '{nome_arquivo}' enviado para o GitHub com sucesso!")
+        return False
+    return True
 
 # ----------------------------
 # Upload do arquivo
 # ----------------------------
 arquivo = st.file_uploader("Selecione o arquivo XLSX", type=["xlsx"])
 
-if arquivo is not None:
-    if st.button("📤 Enviar Arquivo"):
-        try:
-            # ------------------------
-            # Salva local
-            # ------------------------
-            destino = os.path.join(DATA_DIR, arquivo.name)
-            with open(destino, "wb") as f:
-                f.write(arquivo.getbuffer())
-            st.success(f"✅ Arquivo '{arquivo.name}' salvo localmente.")
+if arquivo is not None and st.button("📤 Enviar Arquivo"):
+    try:
+        # ------------------------
+        # Salva local
+        # ------------------------
+        destino = os.path.join(DATA_DIR, arquivo.name)
+        with open(destino, "wb") as f:
+            f.write(arquivo.getbuffer())
 
-            # ------------------------
-            # Salva no GitHub
-            # ------------------------
-            salvar_github(arquivo.name, arquivo.getvalue(), f"Upload {arquivo.name}")
+        # ------------------------
+        # Salva no GitHub
+        # ------------------------
+        sucesso_github = salvar_github(arquivo.name, arquivo.getvalue(), f"Upload {arquivo.name}")
 
-            # ------------------------
-            # Teste rápido de leitura
-            # ------------------------
-            df = pd.read_excel(destino)
-            st.info(f"✅ Arquivo carregado com {len(df)} linhas e {len(df.columns)} colunas")
+        # ------------------------
+        # Teste rápido de leitura
+        # ------------------------
+        df = pd.read_excel(destino)
+
+        # ------------------------
+        # Mensagem única combinada
+        # ------------------------
+        if sucesso_github:
+            st.success(
+                f"✅ Arquivo '{arquivo.name}' enviado com sucesso!\n\n"
+                f"📄 {len(df)} linhas x {len(df.columns)} colunas."
+            )
             st.dataframe(df.head())
+        else:
+            st.warning("Arquivo salvo localmente, mas não foi possível enviar para o GitHub.")
 
-        except Exception as e:
-            st.error(f"❌ Erro no upload: {e}")
+        # ------------------------
+        # Limpa uploader para evitar reenvio
+        # ------------------------
+        st.experimental_rerun()
+
+    except Exception as e:
+        st.error(f"❌ Erro no upload: {e}")
