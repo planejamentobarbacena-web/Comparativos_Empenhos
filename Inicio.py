@@ -3,7 +3,7 @@ import altair as alt
 
 from auth import login
 from components.header import render_header
-from data_loader import load_empenhos  
+from data_loader import load_empenhos
 
 # ======================================================
 # CONFIGURAÇÃO DA PÁGINA
@@ -21,33 +21,37 @@ login()
 render_header()
 
 # ======================================================
-# CSS (opcional)
-# ======================================================
-def load_css():
-    try:
-        with open("assets/style.css") as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    except FileNotFoundError:
-        pass
-
-load_css()
-
-# ======================================================
 # CARREGAMENTO DOS DADOS
 # ======================================================
 df = load_empenhos()
 
 if df.empty:
-    st.warning("Nenhum arquivo encontrado na pasta /data.")
+    st.warning("Nenhum dado carregado.")
     st.stop()
 
 # ======================================================
-# TRATAMENTO PARA FILTROS (remove NaN)
+# VALIDAÇÃO DAS COLUNAS OBRIGATÓRIAS
+# ======================================================
+colunas_necessarias = [
+    "nomeEntidade",
+    "anoEmpenho",
+    "valorEmpenhadoBruto",
+    "valorEmpenhadoAnulado",
+    "valorBaixadoBruto"
+]
+
+faltando = [c for c in colunas_necessarias if c not in df.columns]
+
+if faltando:
+    st.error(f"Colunas ausentes no arquivo: {', '.join(faltando)}")
+    st.stop()
+
+# ======================================================
+# TRATAMENTO BÁSICO
 # ======================================================
 df = df.copy()
-
-df["Ano"] = df["Ano"].dropna()
-df["entidade"] = df["entidade"].fillna("")
+df["nomeEntidade"] = df["nomeEntidade"].fillna("")
+df["anoEmpenho"] = df["anoEmpenho"].fillna("")
 
 # ======================================================
 # TÍTULO
@@ -55,18 +59,16 @@ df["entidade"] = df["entidade"].fillna("")
 st.title("📊 Painel de Empenhos – Visão Geral")
 
 st.markdown(
-    """
-    Bem-vindo ao painel de **análise histórica de empenhos públicos**.  
-    Os dados são carregados automaticamente a partir dos arquivos CSV.
-    """
+    "Análise consolidada de **Empenhado, Anulado e Baixado no Exercício**, "
+    "com filtros simples por **Exercício** e **Entidade**."
 )
 
 # ======================================================
-# MÉTRICAS GERAIS (sempre totais)
+# MÉTRICAS GERAIS
 # ======================================================
-total_empenhado = df["valorEmpenhadoBruto_num"].sum()
-total_anulado   = df["valorEmpenhadoAnulado_num"].sum()
-total_baixado   = df["valorBaixadoBruto_num"].sum()
+total_empenhado = df["valorEmpenhadoBruto"].sum()
+total_anulado   = df["valorEmpenhadoAnulado"].sum()
+total_baixado   = df["valorBaixadoBruto"].sum()
 
 col1, col2, col3 = st.columns(3)
 
@@ -81,86 +83,76 @@ col2.metric(
 )
 
 col3.metric(
-    "✅ Total Baixado",
+    "✅ Total Baixado no Exercício",
     f"R$ {total_baixado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
 
 # ======================================================
-# FILTROS SIMPLES (ENTRE MÉTRICAS E GRÁFICO)
+# FILTROS (ENTRE TOTAIS E GRÁFICO)
 # ======================================================
 st.markdown("---")
 
-col_f1, col_f2 = st.columns(2)
+f1, f2 = st.columns(2)
 
-with col_f1:
-    exercicios = sorted(df["Ano"].dropna().unique())
-    filtro_exercicio = st.selectbox(
+with f1:
+    anos = sorted(df["anoEmpenho"].dropna().unique())
+    filtro_ano = st.selectbox(
         "📅 Exercício",
-        options=["Todos"] + exercicios
+        options=["Todos"] + anos
     )
 
-with col_f2:
-    entidades = sorted(df["entidade"].unique())
+with f2:
+    entidades = sorted(df["nomeEntidade"].unique())
     filtro_entidade = st.selectbox(
         "🏛️ Entidade",
         options=["Todas"] + entidades
     )
 
 # ======================================================
-# APLICA FILTROS
+# APLICAÇÃO DOS FILTROS
 # ======================================================
 df_filtrado = df.copy()
 
-if filtro_exercicio != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["Ano"] == filtro_exercicio]
+if filtro_ano != "Todos":
+    df_filtrado = df_filtrado[df_filtrado["anoEmpenho"] == filtro_ano]
 
 if filtro_entidade != "Todas":
-    df_filtrado = df_filtrado[df_filtrado["entidade"] == filtro_entidade]
+    df_filtrado = df_filtrado[df_filtrado["nomeEntidade"] == filtro_entidade]
+
+if df_filtrado.empty:
+    st.info("Nenhum dado para os filtros selecionados.")
+    st.stop()
 
 # ======================================================
 # GRÁFICO CONSOLIDADO
 # ======================================================
-st.markdown("### 📊 Empenhado × Anulado × Baixado por Exercício")
+st.markdown("### 📊 Empenhado × Anulado × Baixado no Exercício")
 
 graf = (
     alt.Chart(df_filtrado)
     .transform_fold(
         [
-            "valorEmpenhadoBruto_num",
-            "valorEmpenhadoAnulado_num",
-            "valorBaixadoBruto_num"
+            "valorEmpenhadoBruto",
+            "valorEmpenhadoAnulado",
+            "valorBaixadoBruto"
         ],
         as_=["Tipo", "Valor"]
     )
     .transform_calculate(
         TipoLabel="""
-            datum.Tipo == 'valorEmpenhadoBruto_num' ? 'Empenhado' :
-            datum.Tipo == 'valorEmpenhadoAnulado_num' ? 'Anulado' :
-            'Baixado'
+            datum.Tipo == 'valorEmpenhadoBruto' ? 'Empenhado' :
+            datum.Tipo == 'valorEmpenhadoAnulado' ? 'Anulado' :
+            'Baixado no Exercício'
         """
     )
     .mark_bar(size=45)
     .encode(
-        x=alt.X(
-            "TipoLabel:N",
-            title="Tipo de Valor",
-            axis=alt.Axis(labelAngle=0)
-        ),
-        xOffset=alt.XOffset(
-            "Ano:N",
-            scale=alt.Scale(paddingInner=0.05, paddingOuter=0.05),
-            title="Exercício"
-        ),
-        y=alt.Y(
-            "sum(Valor):Q",
-            title="Valor (R$)"
-        ),
-        color=alt.Color(
-            "Ano:N",
-            title="Exercício"
-        ),
+        x=alt.X("TipoLabel:N", title="Tipo"),
+        xOffset=alt.XOffset("anoEmpenho:N", title="Exercício"),
+        y=alt.Y("sum(Valor):Q", title="Valor (R$)"),
+        color=alt.Color("anoEmpenho:N", title="Exercício"),
         tooltip=[
-            "Ano:N",
+            "anoEmpenho:N",
             "TipoLabel:N",
             alt.Tooltip("sum(Valor):Q", format=",.2f")
         ]
@@ -173,41 +165,41 @@ st.altair_chart(graf, use_container_width=True)
 # ======================================================
 # TABELA RESUMIDA
 # ======================================================
-cols_tabela = [
-    "Ano",
-    "numeroEmpenho",
-    "nomeCredor",
-    "numRecurso",
-    "numNaturezaEmp",
-    "valorEmpenhadoBruto_num",
-    "valorEmpenhadoAnulado_num",
-    "valorBaixadoBruto_num"
-]
+st.markdown("### 📄 Resumo dos Dados")
 
-df_tabela = df_filtrado[cols_tabela].copy()
+tabela = (
+    df_filtrado
+    .groupby(["anoEmpenho", "nomeEntidade"], as_index=False)[
+        ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "valorBaixadoBruto"]
+    ]
+    .sum()
+)
 
-for col in [
-    "valorEmpenhadoBruto_num",
-    "valorEmpenhadoAnulado_num",
-    "valorBaixadoBruto_num"
-]:
-    df_tabela[col] = df_tabela[col].apply(
+for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "valorBaixadoBruto"]:
+    tabela[col] = tabela[col].apply(
         lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     )
 
-with st.expander("📋 Ver dados carregados (amostra)"):
-    st.dataframe(df_tabela.head(50), use_container_width=True)
+tabela.columns = [
+    "Exercício",
+    "Entidade",
+    "Empenhado",
+    "Anulado",
+    "Baixado no Exercício"
+]
+
+st.dataframe(tabela, use_container_width=True)
 
 # ======================================================
 # EXPORTAÇÃO
 # ======================================================
-st.markdown("### ⬇️ Exportar dados")
+st.markdown("### ⬇️ Exportar dados filtrados")
 
-csv = df_filtrado.to_csv(index=False, sep=";").encode("utf-8")
+csv = df_filtrado.to_csv(index=False, sep=";", decimal=",", encoding="utf-8-sig")
 
 st.download_button(
-    label="📥 Baixar CSV filtrado",
-    data=csv,
+    "📥 Baixar CSV",
+    csv,
     file_name="empenhos_filtrados.csv",
     mime="text/csv"
 )
