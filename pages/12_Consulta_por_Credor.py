@@ -147,15 +147,30 @@ if comparativo.empty:
 # ==========================
 graf = (
     alt.Chart(comparativo)
-    .mark_bar(size=35)
+    .mark_bar(size=28)  # barras um pouco mais finas
     .encode(
-        x=alt.X("anoEmpenho:N", title="Exercício"),
-        xOffset=alt.XOffset("nomeCredor:N"),
+        x=alt.X(
+            "anoEmpenho:N",
+            title="Exercício",
+            axis=alt.Axis(labelAngle=0)
+        ),
+        xOffset=alt.XOffset(
+            "nomeCredor:N",
+            title=None
+        ),
         y=alt.Y(
             "valorEmpenhadoLiquido:Q",
             title="Valor Empenhado Líquido (R$)"
         ),
-        color=alt.Color("nomeCredor:N", title="Credor"),
+        color=alt.Color(
+            "nomeCredor:N",
+            title="Credor",
+            legend=alt.Legend(
+                orient="bottom",
+                direction="horizontal",
+                columns=2   # 👈 quebra a legenda em colunas no celular
+            )
+        ),
         tooltip=[
             "anoEmpenho:N",
             "nomeCredor:N",
@@ -166,6 +181,7 @@ graf = (
 )
 
 st.altair_chart(graf, use_container_width=True)
+
 
 # ==========================
 # TABELA DETALHADA
