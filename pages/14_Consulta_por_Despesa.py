@@ -1,128 +1,145 @@
 import streamlit as st
-import pandas as pd
 import altair as alt
+import pandas as pd
 
-# =========================================================
-# CONFIGURAÇÃO DA PÁGINA
-# =========================================================
-st.set_page_config(
-    page_title="Consulta por Despesa",
-    layout="wide"
+from auth import login
+from components.header import render_header
+from data_loader import load_empenhos
+
+# 🔐 Segurança
+login()
+render_header()
+
+st.title("📑 Consulta por Despesa")
+
+# =======================
+# CARREGAR DADOS
+# =======================
+df = load_empenhos()
+if df.empty:
+    st.warning("Nenhum dado carregado.")
+    st.stop()
+
+# =======================
+# TRATAMENTO DE VALORES
+# =======================
+for col in [
+    "valorEmpenhadoBruto",
+    "valorEmpenhadoAnulado",
+    "saldoBaixado"
+]:
+    df[col] = (
+        df[col]
+        .astype(str)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
+    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+df["empenhado_liquido"] = (
+    df["valorEmpenhadoBruto"] - df["valorEmpenhadoAnulado"]
 )
 
-st.title("📊 Consulta por Despesa")
+# =======================
+# FILTRO – EXERCÍCIO
+# =======================
+anos = sorted(df["anoEmpenho"].dropna().unique())
 
-# =========================================================
-# CARREGAMENTO DOS DADOS
-# =========================================================
-@st.cache_data
-def load_empenhos():
-    try:
-        return pd.read_csv("data/empenhos_tratados.csv")
-    except Exception:
-        return pd.DataFrame()
+anos_sel = st.multiselect(
+    "📅 Exercício",
+    anos,
+    default=anos
+)
 
-df = load_empenhos()
+df = df[df["anoEmpenho"].isin(anos_sel)]
+
+# =======================
+# FILTRO – ENTIDADE
+# =======================
+entidades = sorted(df["nomeEntidade"].dropna().unique())
+
+entidades_sel = st.multiselect(
+    "🏢 Entidade",
+    entidades,
+    default=entidades
+)
+
+df = df[df["nomeEntidade"].isin(entidades_sel)]
+
+# =======================
+# FILTRO – DESCRIÇÃO DA DESPESA
+# =======================
+despesas = ["Todos"] + sorted(df["Descrição da despesa"].dropna().unique())
+
+despesa_sel = st.multiselect(
+    "📂 Descrição da Despesa",
+    despesas,
+    default=["Todos"]
+)
+
+if "Todos" not in despesa_sel:
+    df = df[df["Descrição da despesa"].isin(despesa_sel)]
+
+# =======================
+# FILTRO – CREDOR
+# =======================
+credores = ["Todos"] + sorted(df["nomeCredor"].dropna().unique())
+
+credor_sel = st.multiselect(
+    "🏷️ Credor",
+    credores,
+    default=["Todos"]
+)
+
+if "Todos" not in credor_sel:
+    df = df[df["nomeCredor"].isin(credor_sel)]
+
+# =======================
+# FILTRO – FONTE
+# =======================
+fontes = ["Todos"] + sorted(df["numRecurso"].dropna().unique())
+
+fonte_sel = st.multiselect(
+    "💰 Fonte de Recurso",
+    fontes,
+    default=["Todos"]
+)
+
+if "Todos" not in fonte_sel:
+    df = df[df["numRecurso"].isin(fonte_sel)]
 
 if df.empty:
-    st.warning("⚠️ Nenhum dado carregado.")
+    st.info("Nenhum dado para os filtros selecionados.")
     st.stop()
 
-# =========================================================
-# TRATAMENTO BÁSICO
-# =========================================================
-colunas_necessarias = [
-    "anoEmpenho",
-    "nomeEntidade",
-    "descricaoDespesa",
-    "nomeCredor",
-    "numRecurso",
-    "valorEmpenhadoLiquido",
-    "valorBaixadoBruto"
-]
-
-df = df[colunas_necessarias].copy()
-
-df = df.fillna("")
-df = df[df["anoEmpenho"] != ""]
-df = df[df["nomeEntidade"] != ""]
-
-# =========================================================
-# FILTROS
-# =========================================================
-st.subheader("🔎 Filtros")
-
-c1, c2, c3, c4 = st.columns(4)
-
-with c1:
-    exercicios = sorted(df["anoEmpenho"].unique())
-    ano_sel = st.selectbox("Exercício", exercicios)
-
-with c2:
-    entidades = sorted(df["nomeEntidade"].unique())
-    entidade_sel = st.selectbox("Entidade", entidades)
-
-with c3:
-    despesas = sorted(df["descricaoDespesa"].unique())
-    despesa_sel = st.selectbox("Despesa", despesas)
-
-with c4:
-    credores = sorted(df["nomeCredor"].unique())
-    credor_sel = st.selectbox("Credor", credores)
-
-df_filtro = df[
-    (df["anoEmpenho"] == ano_sel) &
-    (df["nomeEntidade"] == entidade_sel) &
-    (df["descricaoDespesa"] == despesa_sel) &
-    (df["nomeCredor"] == credor_sel)
-]
-
-if df_filtro.empty:
-    st.info("Nenhum registro encontrado para os filtros selecionados.")
-    st.stop()
-
-# =========================================================
-# AGREGAÇÃO
-# =========================================================
+# =======================
+# AGRUPAMENTO
+# =======================
 comparativo = (
-    df_filtro
-    .groupby("anoEmpenho", as_index=False)
-    .agg(
-        empenhado_liquido=("valorEmpenhadoLiquido", "sum"),
-        saldoBaixado=("valorBaixadoBruto", "sum")
-    )
+    df
+    .groupby("anoEmpenho", as_index=False)[
+        ["empenhado_liquido", "saldoBaixado"]
+    ]
+    .sum()
 )
 
-# =========================================================
-# GRÁFICO
-# =========================================================
-st.subheader("📈 Empenhado Líquido x Baixado no Exercício")
-
+# =======================
+# GRÁFICO (DUAS BARRAS)
+# =======================
 graf = (
     alt.Chart(comparativo)
     .transform_fold(
         ["empenhado_liquido", "saldoBaixado"],
         as_=["Tipo", "Valor"]
     )
-    .mark_bar(size=36)
+    .mark_bar(size=40)
     .encode(
-        x=alt.X(
-            "anoEmpenho:N",
-            title="Exercício",
-            axis=alt.Axis(labelAngle=0)
-        ),
+        x=alt.X("anoEmpenho:N", title="Exercício"),
         xOffset="Tipo:N",
-        y=alt.Y(
-            "Valor:Q",
-            title="Valor (R$)"
-        ),
+        y=alt.Y("Valor:Q", title="Valor (R$)"),
         color=alt.Color(
             "Tipo:N",
             title="Tipo",
-            legend=alt.Legend(
-                orient="bottom",
-                direction="horizontal"
-            ),
             scale=alt.Scale(
                 domain=["empenhado_liquido", "saldoBaixado"],
                 range=["#1f77b4", "#ff7f0e"]
@@ -139,20 +156,55 @@ graf = (
 
 st.altair_chart(graf, use_container_width=True)
 
-# =========================================================
+# =======================
 # TABELA
-# =========================================================
-st.subheader("📋 Dados Consolidados")
+# =======================
+st.subheader("📊 Detalhamento")
 
-tabela = comparativo.copy()
-tabela["Empenhado Líquido (R$)"] = tabela["empenhado_liquido"]
-tabela["Baixado no Exercício (R$)"] = tabela["saldoBaixado"]
-
-st.dataframe(
-    tabela[[
+tabela = df[
+    [
         "anoEmpenho",
-        "Empenhado Líquido (R$)",
-        "Baixado no Exercício (R$)"
-    ]],
-    use_container_width=True
+        "nomeEntidade",
+        "Descrição da despesa",
+        "nomeCredor",
+        "numRecurso",
+        "empenhado_liquido",
+        "saldoBaixado"
+    ]
+].copy()
+
+tabela["Empenhado Líquido"] = tabela["empenhado_liquido"].apply(
+    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+
+tabela["Saldo Baixado"] = tabela["saldoBaixado"].apply(
+    lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+
+tabela = tabela[
+    [
+        "anoEmpenho",
+        "nomeEntidade",
+        "Descrição da despesa",
+        "nomeCredor",
+        "numRecurso",
+        "Empenhado Líquido",
+        "Saldo Baixado"
+    ]
+]
+
+st.dataframe(tabela, use_container_width=True)
+
+# =======================
+# DOWNLOAD CSV
+# =======================
+st.divider()
+
+csv = tabela.to_csv(index=False, sep=";", encoding="utf-8-sig")
+
+st.download_button(
+    "📥 Baixar CSV – Consulta por Despesa",
+    csv,
+    file_name="consulta_por_despesa.csv",
+    mime="text/csv"
 )
