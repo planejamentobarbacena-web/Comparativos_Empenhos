@@ -173,7 +173,7 @@ legend=alt.Legend(
     direction="horizontal",
     columns=2
 )
-
+        ),
         tooltip=[
             "anoEmpenho:N",
             "Tipo:N",
