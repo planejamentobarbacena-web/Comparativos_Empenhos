@@ -29,27 +29,39 @@ if df.empty:
     st.warning("Nenhum dado carregado.")
     st.stop()
 
-# ======================================================
-# VALIDAÇÃO DAS COLUNAS OBRIGATÓRIAS
-# ======================================================
-colunas_necessarias = [
-    "nomeEntidade",
-    "anoEmpenho",
-    "valorEmpenhadoBruto",
-    "valorEmpenhadoAnulado",
-    "valorBaixadoBruto"
-]
+df = df.copy()
 
-faltando = [c for c in colunas_necessarias if c not in df.columns]
+# ======================================================
+# AJUSTE DE COLUNAS (EVITA KeyError)
+# ======================================================
 
-if faltando:
-    st.error(f"Colunas ausentes no arquivo: {', '.join(faltando)}")
+# Exercício
+if "anoEmpenho" not in df.columns:
+    st.error("Coluna 'anoEmpenho' não encontrada.")
     st.stop()
 
-# ======================================================
-# TRATAMENTO BÁSICO
-# ======================================================
-df = df.copy()
+# Entidade
+if "nomeEntidade" not in df.columns:
+    st.error("Coluna 'nomeEntidade' não encontrada.")
+    st.stop()
+
+# Empenhado
+if "valorEmpenhadoBruto" not in df.columns:
+    st.error("Coluna 'valorEmpenhadoBruto' não encontrada.")
+    st.stop()
+
+# Anulado
+if "valorEmpenhadoAnulado" not in df.columns:
+    df["valorEmpenhadoAnulado"] = 0
+
+# Baixado (nome varia no seu CSV)
+if "valorBaixadoBruto" not in df.columns:
+    if "saldoBaixado" in df.columns:
+        df["valorBaixadoBruto"] = df["saldoBaixado"]
+    else:
+        df["valorBaixadoBruto"] = 0
+
+# Limpeza básica
 df["nomeEntidade"] = df["nomeEntidade"].fillna("")
 df["anoEmpenho"] = df["anoEmpenho"].fillna("")
 
@@ -64,31 +76,20 @@ st.markdown(
 )
 
 # ======================================================
-# MÉTRICAS GERAIS
+# MÉTRICAS
 # ======================================================
 total_empenhado = df["valorEmpenhadoBruto"].sum()
 total_anulado   = df["valorEmpenhadoAnulado"].sum()
 total_baixado   = df["valorBaixadoBruto"].sum()
 
-col1, col2, col3 = st.columns(3)
+c1, c2, c3 = st.columns(3)
 
-col1.metric(
-    "💰 Total Empenhado",
-    f"R$ {total_empenhado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
-
-col2.metric(
-    "❌ Total Anulado",
-    f"R$ {total_anulado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
-
-col3.metric(
-    "✅ Total Baixado no Exercício",
-    f"R$ {total_baixado:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
+c1.metric("💰 Total Empenhado", f"R$ {total_empenhado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+c2.metric("❌ Total Anulado", f"R$ {total_anulado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+c3.metric("✅ Total Baixado no Exercício", f"R$ {total_baixado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
 # ======================================================
-# FILTROS (ENTRE TOTAIS E GRÁFICO)
+# FILTROS (ENTRE MÉTRICAS E GRÁFICO)
 # ======================================================
 st.markdown("---")
 
@@ -96,46 +97,33 @@ f1, f2 = st.columns(2)
 
 with f1:
     anos = sorted(df["anoEmpenho"].dropna().unique())
-    filtro_ano = st.selectbox(
-        "📅 Exercício",
-        options=["Todos"] + anos
-    )
+    ano_sel = st.selectbox("📅 Exercício", ["Todos"] + anos)
 
 with f2:
     entidades = sorted(df["nomeEntidade"].unique())
-    filtro_entidade = st.selectbox(
-        "🏛️ Entidade",
-        options=["Todas"] + entidades
-    )
+    ent_sel = st.selectbox("🏛️ Entidade", ["Todas"] + entidades)
 
-# ======================================================
-# APLICAÇÃO DOS FILTROS
-# ======================================================
-df_filtrado = df.copy()
+df_filtro = df.copy()
 
-if filtro_ano != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["anoEmpenho"] == filtro_ano]
+if ano_sel != "Todos":
+    df_filtro = df_filtro[df_filtro["anoEmpenho"] == ano_sel]
 
-if filtro_entidade != "Todas":
-    df_filtrado = df_filtrado[df_filtrado["nomeEntidade"] == filtro_entidade]
+if ent_sel != "Todas":
+    df_filtro = df_filtro[df_filtro["nomeEntidade"] == ent_sel]
 
-if df_filtrado.empty:
+if df_filtro.empty:
     st.info("Nenhum dado para os filtros selecionados.")
     st.stop()
 
 # ======================================================
-# GRÁFICO CONSOLIDADO
+# GRÁFICO
 # ======================================================
 st.markdown("### 📊 Empenhado × Anulado × Baixado no Exercício")
 
 graf = (
-    alt.Chart(df_filtrado)
+    alt.Chart(df_filtro)
     .transform_fold(
-        [
-            "valorEmpenhadoBruto",
-            "valorEmpenhadoAnulado",
-            "valorBaixadoBruto"
-        ],
+        ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "valorBaixadoBruto"],
         as_=["Tipo", "Valor"]
     )
     .transform_calculate(
@@ -163,12 +151,12 @@ graf = (
 st.altair_chart(graf, use_container_width=True)
 
 # ======================================================
-# TABELA RESUMIDA
+# TABELA
 # ======================================================
-st.markdown("### 📄 Resumo dos Dados")
+st.markdown("### 📄 Resumo")
 
 tabela = (
-    df_filtrado
+    df_filtro
     .groupby(["anoEmpenho", "nomeEntidade"], as_index=False)[
         ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "valorBaixadoBruto"]
     ]
@@ -189,17 +177,3 @@ tabela.columns = [
 ]
 
 st.dataframe(tabela, use_container_width=True)
-
-# ======================================================
-# EXPORTAÇÃO
-# ======================================================
-st.markdown("### ⬇️ Exportar dados filtrados")
-
-csv = df_filtrado.to_csv(index=False, sep=";", decimal=",", encoding="utf-8-sig")
-
-st.download_button(
-    "📥 Baixar CSV",
-    csv,
-    file_name="empenhos_filtrados.csv",
-    mime="text/csv"
-)
