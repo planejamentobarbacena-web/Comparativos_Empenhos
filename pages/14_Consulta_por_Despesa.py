@@ -168,18 +168,12 @@ graf = (
                 domain=["empenhado_liquido", "saldoBaixado"],
                 range=["#1f77b4", "#ff7f0e"]
             ),
-        legend=alt.Legend(
-            orient="bottom",
-            direction="horizontal",
-            columns=2,
-            labelExpr="""
-                datum.label == 'empenhado_liquido'
-                ? 'Empenhado Líquido'
-                : datum.label == 'saldoBaixado'
-                ? 'Baixado no Exercício'
-                : datum.label
-            """
-        )
+legend=alt.Legend(
+    orient="bottom",
+    direction="horizontal",
+    columns=2
+)
+
         tooltip=[
             "anoEmpenho:N",
             "Tipo:N",
