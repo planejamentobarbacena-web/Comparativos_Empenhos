@@ -171,7 +171,14 @@ graf = (
 legend=alt.Legend(
     orient="bottom",
     direction="horizontal",
-    columns=2
+    columns=2,
+    labelExpr="""
+        datum.label == 'empenhado_liquido'
+        ? 'Empenhado Líquido'
+        : datum.label == 'saldoBaixado'
+        ? 'Baixado no Exercício'
+        : datum.label
+    """
 )
         ),
         tooltip=[
