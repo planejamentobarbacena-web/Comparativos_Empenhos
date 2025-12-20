@@ -139,11 +139,25 @@ st.markdown("### 📊 Empenhado × Anulado × Baixado por Exercício")
 
 graf = (
     alt.Chart(df_long)
-    .mark_bar(size=40)
+    .mark_bar(size=28)
     .encode(
-        x=alt.X("anoEmpenho:N", title="Exercício"),
-        y=alt.Y("Valor:Q", title="Valor (R$)"),
-        color=alt.Color("Tipo:N", title="Tipo"),
+        x=alt.X(
+            "anoEmpenho:N",
+            title="Exercício",
+            axis=alt.Axis(labelAngle=0)
+        ),
+        y=alt.Y(
+            "Valor:Q",
+            title="Valor (R$)"
+        ),
+        color=alt.Color(
+            "Tipo:N",
+            title="Tipo",
+            legend=alt.Legend(
+                orient="bottom",      # 👈 legenda embaixo
+                direction="horizontal"
+            )
+        ),
         tooltip=[
             "anoEmpenho:N",
             "Tipo:N",
@@ -152,6 +166,7 @@ graf = (
     )
     .properties(height=420)
 )
+
 
 st.altair_chart(graf, use_container_width=True)
 
