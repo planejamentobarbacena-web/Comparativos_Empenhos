@@ -1,148 +1,153 @@
 import streamlit as st
 import altair as alt
+import pandas as pd
 
 from auth import login
 from components.header import render_header
-from data_loader import load_empenhos
+from data_loader import load_empenhos  
 
-# ======================================================
-# CONFIGURAÇÃO DA PÁGINA
-# ======================================================
+# ==================================
+# CONFIGURAÇÃO
+# ==================================
 st.set_page_config(
     page_title="Painel de Empenhos",
     page_icon="📊",
     layout="wide"
 )
 
-# ======================================================
-# SEGURANÇA
-# ======================================================
 login()
 render_header()
 
-# ======================================================
-# CARREGAMENTO DOS DADOS
-# ======================================================
+st.title("📊 Painel de Empenhos – Visão Geral")
+
+# ==================================
+# CARREGAR DADOS
+# ==================================
 df = load_empenhos()
 
 if df.empty:
     st.warning("Nenhum dado carregado.")
     st.stop()
 
-df = df.copy()
-
-# ======================================================
-# AJUSTE DE COLUNAS (EVITA KeyError)
-# ======================================================
+# ==================================
+# TRATAMENTO BÁSICO (OBRIGATÓRIO)
+# ==================================
 
 # Exercício
-if "anoEmpenho" not in df.columns:
-    st.error("Coluna 'anoEmpenho' não encontrada.")
-    st.stop()
-
-# Entidade
-if "nomeEntidade" not in df.columns:
-    st.error("Coluna 'nomeEntidade' não encontrada.")
-    st.stop()
-
-# Empenhado
-if "valorEmpenhadoBruto" not in df.columns:
-    st.error("Coluna 'valorEmpenhadoBruto' não encontrada.")
-    st.stop()
-
-# Anulado
-if "valorEmpenhadoAnulado" not in df.columns:
-    df["valorEmpenhadoAnulado"] = 0
-
-# Baixado (nome varia no seu CSV)
-if "valorBaixadoBruto" not in df.columns:
-    if "saldoBaixado" in df.columns:
-        df["valorBaixadoBruto"] = df["saldoBaixado"]
-    else:
-        df["valorBaixadoBruto"] = 0
-
-# Limpeza básica
-df["nomeEntidade"] = df["nomeEntidade"].fillna("")
-df["anoEmpenho"] = df["anoEmpenho"].fillna("")
-
-# ======================================================
-# TÍTULO
-# ======================================================
-st.title("📊 Painel de Empenhos – Visão Geral")
-
-st.markdown(
-    "Análise consolidada de **Empenhado, Anulado e Baixado no Exercício**, "
-    "com filtros simples por **Exercício** e **Entidade**."
+df["anoEmpenho"] = (
+    df["anoEmpenho"]
+    .astype(str)
+    .str.replace(".0", "", regex=False)
+    .str.strip()
 )
 
-# ======================================================
-# MÉTRICAS
-# ======================================================
-total_empenhado = df["valorEmpenhadoBruto"].sum()
-total_anulado   = df["valorEmpenhadoAnulado"].sum()
-total_baixado   = df["valorBaixadoBruto"].sum()
+# Entidade
+df["nomeEntidade"] = df["nomeEntidade"].fillna("").astype(str).str.strip()
 
-c1, c2, c3 = st.columns(3)
+# Remover registros inválidos
+df = df[(df["anoEmpenho"] != "") & (df["anoEmpenho"] != "nan")]
+df = df[df["nomeEntidade"] != ""]
 
-c1.metric("💰 Total Empenhado", f"R$ {total_empenhado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-c2.metric("❌ Total Anulado", f"R$ {total_anulado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-c3.metric("✅ Total Baixado no Exercício", f"R$ {total_baixado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+# Valores numéricos
+col_valores = {
+    "valorEmpenhadoBruto": "Empenhado",
+    "valorEmpenhadoAnulado": "Anulado",
+    "valorBaixadoBruto": "Baixado no Exercício"
+}
 
-# ======================================================
+for col in col_valores:
+    df[col] = (
+        df[col]
+        .astype(str)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
+    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+# ==================================
+# MÉTRICAS GERAIS
+# ==================================
+col1, col2, col3 = st.columns(3)
+
+col1.metric(
+    "💰 Total Empenhado",
+    f"R$ {df['valorEmpenhadoBruto'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+
+col2.metric(
+    "❌ Total Anulado",
+    f"R$ {df['valorEmpenhadoAnulado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+
+col3.metric(
+    "✅ Total Baixado",
+    f"R$ {df['valorBaixadoBruto'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+
+# ==================================
 # FILTROS (ENTRE MÉTRICAS E GRÁFICO)
-# ======================================================
-st.markdown("---")
+# ==================================
+st.divider()
 
-f1, f2 = st.columns(2)
+anos = sorted(df["anoEmpenho"].unique())
+entidades = sorted(df["nomeEntidade"].unique())
 
-with f1:
-    anos = sorted(df["anoEmpenho"].dropna().unique())
-    ano_sel = st.selectbox("📅 Exercício", ["Todos"] + anos)
+colf1, colf2 = st.columns(2)
 
-with f2:
-    entidades = sorted(df["nomeEntidade"].unique())
-    ent_sel = st.selectbox("🏛️ Entidade", ["Todas"] + entidades)
+with colf1:
+    ano_sel = st.multiselect(
+        "📅 Exercício",
+        anos,
+        default=anos
+    )
 
-df_filtro = df.copy()
+with colf2:
+    entidade_sel = st.multiselect(
+        "🏢 Entidade",
+        entidades,
+        default=entidades
+    )
 
-if ano_sel != "Todos":
-    df_filtro = df_filtro[df_filtro["anoEmpenho"] == ano_sel]
+df = df[
+    df["anoEmpenho"].isin(ano_sel) &
+    df["nomeEntidade"].isin(entidade_sel)
+]
 
-if ent_sel != "Todas":
-    df_filtro = df_filtro[df_filtro["nomeEntidade"] == ent_sel]
+# ==================================
+# PREPARAÇÃO PARA O GRÁFICO
+# ==================================
+df_graf = (
+    df.groupby("anoEmpenho", as_index=False)
+    .agg({
+        "valorEmpenhadoBruto": "sum",
+        "valorEmpenhadoAnulado": "sum",
+        "valorBaixadoBruto": "sum"
+    })
+    .rename(columns=col_valores)
+)
 
-if df_filtro.empty:
-    st.info("Nenhum dado para os filtros selecionados.")
-    st.stop()
+df_long = df_graf.melt(
+    id_vars="anoEmpenho",
+    var_name="Tipo",
+    value_name="Valor"
+)
 
-# ======================================================
+# ==================================
 # GRÁFICO
-# ======================================================
-st.markdown("### 📊 Empenhado × Anulado × Baixado no Exercício")
+# ==================================
+st.markdown("### 📊 Empenhado × Anulado × Baixado por Exercício")
 
 graf = (
-    alt.Chart(df_filtro)
-    .transform_fold(
-        ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "valorBaixadoBruto"],
-        as_=["Tipo", "Valor"]
-    )
-    .transform_calculate(
-        TipoLabel="""
-            datum.Tipo == 'valorEmpenhadoBruto' ? 'Empenhado' :
-            datum.Tipo == 'valorEmpenhadoAnulado' ? 'Anulado' :
-            'Baixado no Exercício'
-        """
-    )
-    .mark_bar(size=45)
+    alt.Chart(df_long)
+    .mark_bar(size=40)
     .encode(
-        x=alt.X("TipoLabel:N", title="Tipo"),
-        xOffset=alt.XOffset("anoEmpenho:N", title="Exercício"),
-        y=alt.Y("sum(Valor):Q", title="Valor (R$)"),
-        color=alt.Color("anoEmpenho:N", title="Exercício"),
+        x=alt.X("anoEmpenho:N", title="Exercício"),
+        y=alt.Y("Valor:Q", title="Valor (R$)"),
+        color=alt.Color("Tipo:N", title="Tipo"),
         tooltip=[
             "anoEmpenho:N",
-            "TipoLabel:N",
-            alt.Tooltip("sum(Valor):Q", format=",.2f")
+            "Tipo:N",
+            alt.Tooltip("Valor:Q", format=",.2f")
         ]
     )
     .properties(height=420)
@@ -150,30 +155,16 @@ graf = (
 
 st.altair_chart(graf, use_container_width=True)
 
-# ======================================================
-# TABELA
-# ======================================================
-st.markdown("### 📄 Resumo")
+# ==================================
+# TABELA RESUMO
+# ==================================
+st.subheader("📋 Resumo por Exercício")
 
-tabela = (
-    df_filtro
-    .groupby(["anoEmpenho", "nomeEntidade"], as_index=False)[
-        ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "valorBaixadoBruto"]
-    ]
-    .sum()
-)
+tabela = df_graf.copy()
 
-for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "valorBaixadoBruto"]:
+for col in ["Empenhado", "Anulado", "Baixado no Exercício"]:
     tabela[col] = tabela[col].apply(
         lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     )
-
-tabela.columns = [
-    "Exercício",
-    "Entidade",
-    "Empenhado",
-    "Anulado",
-    "Baixado no Exercício"
-]
 
 st.dataframe(tabela, use_container_width=True)
