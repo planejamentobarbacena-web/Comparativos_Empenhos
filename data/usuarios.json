@@ -20,6 +20,12 @@
     "perfil": "USER",
     "status": "ativo"
   },
+    "Rodrigo": {
+    "email": "a@",
+    "senha": "123",
+    "perfil": "USER",
+    "status": "ativo"
+  },
   "Julio": {
     "senha": "123654",
     "perfil": "USER",
