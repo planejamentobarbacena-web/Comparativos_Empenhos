@@ -48,14 +48,14 @@ df["nomeEntidade"] = df["nomeEntidade"].fillna("").astype(str).str.strip()
 df = df[(df["anoEmpenho"] != "") & (df["anoEmpenho"] != "nan")]
 df = df[df["nomeEntidade"] != ""]
 
-# Colunas financeiras
-col_valores = {
-    "valorEmpenhadoBruto": "Empenhado",
-    "valorEmpenhadoAnulado": "Anulado",
-    "saldoBaixado": "Baixado no Exercício"
-}
+# Conversão numérica
+colunas_valor = [
+    "valorEmpenhadoBruto",
+    "valorEmpenhadoAnulado",
+    "saldoBaixado"
+]
 
-for col in col_valores:
+for col in colunas_valor:
     df[col] = (
         df[col]
         .astype(str)
@@ -65,7 +65,7 @@ for col in col_valores:
     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
 # ==================================
-# MÉTRICAS GERAIS
+# MÉTRICAS
 # ==================================
 col1, col2, col3 = st.columns(3)
 
@@ -80,7 +80,7 @@ col2.metric(
 )
 
 col3.metric(
-    "✅ Total Baixado no Exercício",
+    "✅ Total Baixado",
     f"R$ {df['saldoBaixado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
 
@@ -92,12 +92,12 @@ st.divider()
 anos = sorted(df["anoEmpenho"].unique())
 entidades = sorted(df["nomeEntidade"].unique())
 
-colf1, colf2 = st.columns(2)
+c1, c2 = st.columns(2)
 
-with colf1:
+with c1:
     ano_sel = st.multiselect("📅 Exercício", anos, default=anos)
 
-with colf2:
+with c2:
     entidade_sel = st.multiselect("🏢 Entidade", entidades, default=entidades)
 
 df = df[
@@ -106,7 +106,7 @@ df = df[
 ]
 
 # ==================================
-# AGREGAÇÃO POR EXERCÍCIO
+# PREPARAÇÃO DO GRÁFICO
 # ==================================
 df_graf = (
     df.groupby("anoEmpenho", as_index=False)
@@ -115,54 +115,54 @@ df_graf = (
         "valorEmpenhadoAnulado": "sum",
         "saldoBaixado": "sum"
     })
-    .rename(columns=col_valores)
 )
 
-# ==================================
-# RESTOS A PAGAR
-# ==================================
-df_graf["Resto a Pagar"] = (
-    df_graf["Empenhado"]
-    - df_graf["Anulado"]
-    - df_graf["Baixado no Exercício"]
+df_graf["Restos a Pagar"] = (
+    df_graf["valorEmpenhadoBruto"]
+    - df_graf["valorEmpenhadoAnulado"]
+    - df_graf["saldoBaixado"]
 )
 
-# ==================================
-# PREPARAÇÃO DO GRÁFICO
-# ==================================
-
-# Empilhado dentro do Empenhado
-df_empilhado = df_graf.melt(
+df_long = df_graf.melt(
     id_vars="anoEmpenho",
-    value_vars=["Anulado", "Baixado no Exercício", "Resto a Pagar"],
+    value_vars=[
+        "valorEmpenhadoAnulado",
+        "Restos a Pagar",
+        "saldoBaixado"
+    ],
     var_name="Tipo",
     value_name="Valor"
 )
-df_empilhado["Grupo"] = "Empenhado"
 
-# Coluna isolada de Restos
-df_restos = df_graf[["anoEmpenho", "Resto a Pagar"]].copy()
-df_restos["Tipo"] = "Restos a Pagar"
-df_restos["Valor"] = df_restos["Resto a Pagar"]
-df_restos["Grupo"] = "Restos a Pagar"
+mapa_tipos = {
+    "valorEmpenhadoAnulado": "Anulado",
+    "Restos a Pagar": "Restos a Pagar",
+    "saldoBaixado": "Baixado no Exercício"
+}
 
-df_plot = pd.concat([df_empilhado, df_restos], ignore_index=True)
+df_long["Tipo"] = df_long["Tipo"].map(mapa_tipos)
+
+# Ordem da pilha (baixo → cima)
+ordem_tipo = [
+    "Anulado",
+    "Restos a Pagar",
+    "Baixado no Exercício"
+]
 
 # ==================================
 # GRÁFICO
 # ==================================
-st.markdown("### 📊 Empenhado e Restos a Pagar por Exercício")
+st.markdown("### 📊 Composição do Empenhado por Exercício")
 
 graf = (
-    alt.Chart(df_plot)
-    .mark_bar(size=26)
+    alt.Chart(df_long)
+    .mark_bar(size=34)  # 👈 largura ajustada (desktop + mobile)
     .encode(
         x=alt.X(
             "anoEmpenho:N",
             title="Exercício",
             axis=alt.Axis(labelAngle=0)
         ),
-        xOffset=alt.XOffset("Grupo:N"),
         y=alt.Y(
             "Valor:Q",
             title="Valor (R$)",
@@ -170,20 +170,11 @@ graf = (
         ),
         color=alt.Color(
             "Tipo:N",
+            sort=ordem_tipo,
             title="Composição",
             scale=alt.Scale(
-                domain=[
-                    "Anulado",
-                    "Baixado no Exercício",
-                    "Resto a Pagar",
-                    "Restos a Pagar"
-                ],
-                range=[
-                    "#d62728",
-                    "#2ca02c",
-                    "#1f77b4",
-                    "#9467bd"
-                ]
+                domain=ordem_tipo,
+                range=["#d62728", "#ffbb78", "#2ca02c"]
             ),
             legend=alt.Legend(
                 orient="bottom",
@@ -192,12 +183,11 @@ graf = (
         ),
         tooltip=[
             "anoEmpenho:N",
-            "Grupo:N",
             "Tipo:N",
             alt.Tooltip("Valor:Q", format=",.2f")
         ]
     )
-    .properties(height=430)
+    .properties(height=420)
 )
 
 st.altair_chart(graf, use_container_width=True)
@@ -209,7 +199,13 @@ st.subheader("📋 Resumo por Exercício")
 
 tabela = df_graf.copy()
 
-for col in ["Empenhado", "Anulado", "Baixado no Exercício", "Resto a Pagar"]:
+tabela = tabela.rename(columns={
+    "valorEmpenhadoBruto": "Empenhado",
+    "valorEmpenhadoAnulado": "Anulado",
+    "saldoBaixado": "Baixado no Exercício"
+})
+
+for col in ["Empenhado", "Anulado", "Baixado no Exercício", "Restos a Pagar"]:
     tabela[col] = tabela[col].apply(
         lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     )
