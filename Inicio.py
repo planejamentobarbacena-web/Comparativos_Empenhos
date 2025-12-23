@@ -18,29 +18,6 @@ st.set_page_config(
 login()
 render_header()
 
-# ==================================
-# CSS RESPONSIVO (DESKTOP x MOBILE)
-# ==================================
-st.markdown("""
-<style>
-
-/* Esconde versão desktop no celular */
-@media (max-width: 768px) {
-    .desktop-only {
-        display: none !important;
-    }
-}
-
-/* Esconde versão mobile no desktop */
-@media (min-width: 769px) {
-    .mobile-only {
-        display: none !important;
-    }
-}
-
-</style>
-""", unsafe_allow_html=True)
-
 st.title("📊 Painel de Empenhos – Visão Geral")
 
 # ==================================
@@ -67,18 +44,18 @@ df["anoEmpenho"] = (
 # Entidade
 df["nomeEntidade"] = df["nomeEntidade"].fillna("").astype(str).str.strip()
 
-# Remover inválidos
+# Remover registros inválidos
 df = df[(df["anoEmpenho"] != "") & (df["anoEmpenho"] != "nan")]
 df = df[df["nomeEntidade"] != ""]
 
-# Valores numéricos
-colunas = [
+# Conversão numérica
+colunas_valor = [
     "valorEmpenhadoBruto",
     "valorEmpenhadoAnulado",
     "saldoBaixado"
 ]
 
-for col in colunas:
+for col in colunas_valor:
     df[col] = (
         df[col]
         .astype(str)
@@ -115,12 +92,12 @@ st.divider()
 anos = sorted(df["anoEmpenho"].unique())
 entidades = sorted(df["nomeEntidade"].unique())
 
-colf1, colf2 = st.columns(2)
+c1, c2 = st.columns(2)
 
-with colf1:
+with c1:
     ano_sel = st.multiselect("📅 Exercício", anos, default=anos)
 
-with colf2:
+with c2:
     entidade_sel = st.multiselect("🏢 Entidade", entidades, default=entidades)
 
 df = df[
@@ -140,7 +117,6 @@ df_graf = (
     })
 )
 
-# Restos a Pagar (parte interna do Empenhado)
 df_graf["Restos a Pagar"] = (
     df_graf["valorEmpenhadoBruto"]
     - df_graf["valorEmpenhadoAnulado"]
@@ -149,33 +125,57 @@ df_graf["Restos a Pagar"] = (
 
 df_long = df_graf.melt(
     id_vars="anoEmpenho",
-    value_vars=["valorEmpenhadoAnulado", "Restos a Pagar", "saldoBaixado"],
+    value_vars=[
+        "valorEmpenhadoAnulado",
+        "Restos a Pagar",
+        "saldoBaixado"
+    ],
     var_name="Tipo",
     value_name="Valor"
 )
 
-# Renomear para legenda
-df_long["Tipo"] = df_long["Tipo"].replace({
+mapa_tipos = {
     "valorEmpenhadoAnulado": "Anulado",
+    "Restos a Pagar": "Restos a Pagar",
     "saldoBaixado": "Baixado no Exercício"
-})
+}
 
-# Ordem correta do empilhamento
-ordem_tipo = ["Anulado", "Restos a Pagar", "Baixado no Exercício"]
+df_long["Tipo"] = df_long["Tipo"].map(mapa_tipos)
+
+# Ordem da pilha (baixo → cima)
+ordem_tipo = [
+    "Anulado",
+    "Restos a Pagar",
+    "Baixado no Exercício"
+]
 
 # ==================================
-# GRÁFICO DESKTOP
+# GRÁFICO
 # ==================================
-graf_desktop = (
+st.markdown("### 📊 Composição do Empenhado por Exercício")
+
+graf = (
     alt.Chart(df_long)
-    .mark_bar(size=34)
+    .mark_bar(size=34)  # 👈 largura ajustada (desktop + mobile)
     .encode(
-        x=alt.X("anoEmpenho:N", title="Exercício"),
-        y=alt.Y("Valor:Q", title="Valor (R$)"),
+        x=alt.X(
+            "anoEmpenho:N",
+            title="Exercício",
+            axis=alt.Axis(labelAngle=0)
+        ),
+        y=alt.Y(
+            "Valor:Q",
+            title="Valor (R$)",
+            stack="zero"
+        ),
         color=alt.Color(
             "Tipo:N",
             sort=ordem_tipo,
             title="Composição",
+            scale=alt.Scale(
+                domain=ordem_tipo,
+                range=["#d62728", "#ffbb78", "#2ca02c"]
+            ),
             legend=alt.Legend(
                 orient="bottom",
                 direction="horizontal"
@@ -190,34 +190,24 @@ graf_desktop = (
     .properties(height=420)
 )
 
+st.altair_chart(graf, use_container_width=True)
+
 # ==================================
-# GRÁFICO MOBILE (SIMPLIFICADO)
+# TABELA RESUMO
 # ==================================
-graf_mobile = (
-    alt.Chart(df_long)
-    .mark_bar(size=46)
-    .encode(
-        x=alt.X("anoEmpenho:N", title=None),
-        y=alt.Y("Valor:Q", title="R$"),
-        color=alt.Color("Tipo:N", sort=ordem_tipo, legend=None),
-        tooltip=[
-            "anoEmpenho:N",
-            "Tipo:N",
-            alt.Tooltip("Valor:Q", format=",.2f")
-        ]
+st.subheader("📋 Resumo por Exercício")
+
+tabela = df_graf.copy()
+
+tabela = tabela.rename(columns={
+    "valorEmpenhadoBruto": "Empenhado",
+    "valorEmpenhadoAnulado": "Anulado",
+    "saldoBaixado": "Baixado no Exercício"
+})
+
+for col in ["Empenhado", "Anulado", "Baixado no Exercício", "Restos a Pagar"]:
+    tabela[col] = tabela[col].apply(
+        lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     )
-    .properties(height=320)
-)
 
-# ==================================
-# EXIBIÇÃO RESPONSIVA
-# ==================================
-st.markdown('<div class="desktop-only">', unsafe_allow_html=True)
-st.markdown("### 📊 Composição do Empenhado por Exercício")
-st.altair_chart(graf_desktop, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
-
-st.markdown('<div class="mobile-only">', unsafe_allow_html=True)
-st.markdown("### 📊 Empenhado por Exercício")
-st.altair_chart(graf_mobile, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+st.dataframe(tabela, use_container_width=True)
