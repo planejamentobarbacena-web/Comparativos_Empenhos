@@ -156,7 +156,7 @@ st.markdown("### 📊 Composição do Empenhado por Exercício")
 
 graf = (
     alt.Chart(df_long)
-    .mark_bar(size=80)  # 👈 largura ajustada (desktop + mobile)
+    .mark_bar(size=60)  # 👈 largura ajustada 
     .encode(
         x=alt.X(
             "anoEmpenho:N",
