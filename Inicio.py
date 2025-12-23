@@ -156,12 +156,16 @@ st.markdown("### 📊 Composição do Empenhado por Exercício")
 
 graf = (
     alt.Chart(df_long)
-    .mark_bar(size=60)  # 👈 largura ajustada 
+    .mark_bar(size=48)  # largura equilibrada (desktop + celular)
     .encode(
         x=alt.X(
             "anoEmpenho:N",
             title="Exercício",
-            axis=alt.Axis(labelAngle=0)
+            axis=alt.Axis(labelAngle=0),
+            scale=alt.Scale(
+                paddingInner=0.25,
+                paddingOuter=0.10
+            )
         ),
         y=alt.Y(
             "Valor:Q",
