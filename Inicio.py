@@ -58,9 +58,18 @@ for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "saldoBaixado"]:
 # ==================================
 c1, c2, c3 = st.columns(3)
 
-c1.metric("💰 Total Empenhado", f"R$ {df['valorEmpenhadoBruto'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-c2.metric("❌ Total Anulado", f"R$ {df['valorEmpenhadoAnulado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-c3.metric("✅ Total Baixado", f"R$ {df['saldoBaixado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+c1.metric(
+    "💰 Total Empenhado",
+    f"R$ {df['valorEmpenhadoBruto'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+c2.metric(
+    "❌ Total Anulado",
+    f"R$ {df['valorEmpenhadoAnulado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
+c3.metric(
+    "✅ Total Baixado",
+    f"R$ {df['saldoBaixado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+)
 
 # ==================================
 # FILTROS
@@ -108,17 +117,23 @@ df_long = df_graf.melt(
     value_name="Valor"
 )
 
-mapa = {
+mapa_tipos = {
     "valorEmpenhadoAnulado": "Anulado",
     "Restos a Pagar": "Restos a Pagar",
     "saldoBaixado": "Baixado no Exercício"
 }
-df_long["Tipo"] = df_long["Tipo"].map(mapa)
+df_long["Tipo"] = df_long["Tipo"].map(mapa_tipos)
 
 ordem_tipo = ["Anulado", "Restos a Pagar", "Baixado no Exercício"]
 
-# Percentual
-df_long["Total"] = df_long.groupby("anoEmpenho")["Valor"].transform("sum")
+# Percentual (APENAS PARA TOOLTIP)
+df_totais = (
+    df_long.groupby("anoEmpenho", as_index=False)["Valor"]
+    .sum()
+    .rename(columns={"Valor": "Total"})
+)
+
+df_long = df_long.merge(df_totais, on="anoEmpenho")
 df_long["Percentual"] = df_long["Valor"] / df_long["Total"]
 
 # ==================================
@@ -126,47 +141,48 @@ df_long["Percentual"] = df_long["Valor"] / df_long["Total"]
 # ==================================
 st.markdown("### 📊 Composição do Empenhado por Exercício")
 
-base = alt.Chart(df_long).encode(
-    x=alt.X(
-        "anoEmpenho:N",
-        title="Exercício",
-        axis=alt.Axis(labelAngle=0),
-        scale=alt.Scale(paddingInner=0.15, paddingOuter=0.05)
-    ),
-    y=alt.Y(
-        "Valor:Q",
-        stack="zero",
-        title="Valor (R$)"
-    ),
-    color=alt.Color(
-        "Tipo:N",
-        sort=ordem_tipo,
-        scale=alt.Scale(
-            domain=ordem_tipo,
-            range=["#d62728", "#ffbb78", "#2ca02c"]
+graf = (
+    alt.Chart(df_long)
+    .mark_bar(size=60)
+    .encode(
+        x=alt.X(
+            "anoEmpenho:N",
+            title="Exercício",
+            axis=alt.Axis(labelAngle=0),
+            scale=alt.Scale(paddingInner=0.15, paddingOuter=0.05)
         ),
-        legend=alt.Legend(orient="bottom", direction="horizontal")
+        y=alt.Y(
+            "Valor:Q",
+            title="Valor (R$)",
+            stack="zero"
+        ),
+        color=alt.Color(
+            "Tipo:N",
+            sort=ordem_tipo,
+            title="Composição",
+            scale=alt.Scale(
+                domain=ordem_tipo,
+                range=["#d62728", "#ffbb78", "#2ca02c"]
+            ),
+            legend=alt.Legend(
+                orient="bottom",
+                direction="horizontal"
+            )
+        ),
+        tooltip=[
+            "anoEmpenho:N",
+            "Tipo:N",
+            alt.Tooltip("Valor:Q", format=",.2f", title="Valor"),
+            alt.Tooltip("Percentual:Q", format=".1%", title="Percentual")
+        ]
     )
+    .properties(height=420)
 )
-
-barras = base.mark_bar(size=60)
-
-# 🔥 TEXTO CORRETO (centralizado em cada faixa)
-texto = base.mark_text(
-    color="black",
-    fontSize=12,
-    fontWeight="bold"
-).encode(
-    text=alt.Text("Percentual:Q", format=".0%"),
-    y=alt.Y("Valor:Q", stack="center")  # 👈 A CHAVE DO SUCESSO
-)
-
-graf = (barras + texto).properties(height=420)
 
 st.altair_chart(graf, use_container_width=True)
 
 # ==================================
-# TABELA
+# TABELA RESUMO
 # ==================================
 st.subheader("📋 Resumo por Exercício")
 
