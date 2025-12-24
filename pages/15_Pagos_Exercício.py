@@ -62,18 +62,19 @@ df["saldoBaixado"] = pd.to_numeric(
 # ==================================
 st.markdown("### 🔎 Filtros")
 
-def filtro_multiselect(coluna, label):
-    opcoes = ["Todos"] + sorted(df[coluna].dropna().unique().tolist())
+def filtro_multiselect(df_base, coluna, label):
+    opcoes = sorted(df_base[coluna].dropna().unique().tolist())
+
     selecionado = st.multiselect(
         label,
         options=opcoes,
-        default=["Todos"]
+        default=opcoes
     )
 
-    if "Todos" in selecionado or not selecionado:
-        return df
+    if not selecionado:
+        return df_base
 
-    return df[df[coluna].isin(selecionado)]
+    return df_base[df_base[coluna].isin(selecionado)]
 
 df_filtrado = filtro_multiselect("anoEmpenho", "📅 Exercício")
 df_filtrado = filtro_multiselect("nomeEntidade", "🏢 Entidade")
