@@ -1,6 +1,7 @@
 import streamlit as st
 import altair as alt
 import pandas as pd
+import unicodedata
 
 from auth import login
 from components.header import render_header
@@ -13,6 +14,17 @@ login()
 render_header()
 
 st.title("💰 Pagos no Exercício")
+
+# ==================================
+# FUNÇÃO AUXILIAR – NORMALIZA TEXTO
+# ==================================
+def normalizar(txt):
+    if pd.isna(txt):
+        return ""
+    txt = str(txt)
+    txt = unicodedata.normalize("NFD", txt)
+    txt = "".join(c for c in txt if unicodedata.category(c) != "Mn")
+    return txt.lower().strip()
 
 # ==================================
 # CARREGAR DADOS (PADRÃO DO PROJETO)
@@ -43,28 +55,28 @@ df["nomeEntidade"] = (
 df = df.dropna(subset=["anoEmpenho", "nomeEntidade"])
 
 # ==================================
-# TRATAMENTO DO VALOR USADO NO PAINEL
+# TRATAMENTO DOS VALORES NUMÉRICOS
 # ==================================
-df["saldoBaixado"] = (
-    df["saldoBaixado"]
-    .astype(str)
-    .str.replace(".", "", regex=False)
-    .str.replace(",", ".", regex=False)
-)
-
-df["saldoBaixado"] = pd.to_numeric(
-    df["saldoBaixado"],
-    errors="coerce"
-).fillna(0)
+for col in ["saldoBaixado", "valorEmpenhadoBruto"]:
+    df[col] = (
+        df[col]
+        .astype(str)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
+    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
 # ==================================
-# FILTROS LIVRES (VERTICAIS)
+# FILTRO MULTISELECT (AMARRADO + TODOS + SEM ACENTO)
 # ==================================
-st.markdown("### 🔎 Filtros")
-
 def filtro_multiselect(df_base, coluna, label):
-    opcoes = sorted(df_base[coluna].dropna().unique().tolist())
-    opcoes = ["Todos"] + opcoes  # 👈 adiciona Todos
+    df_aux = df_base.copy()
+
+    col_norm = coluna + "_norm"
+    df_aux[col_norm] = df_aux[coluna].apply(normalizar)
+
+    opcoes = sorted(df_aux[coluna].dropna().unique().tolist())
+    opcoes = ["Todos"] + opcoes
 
     selecionado = st.multiselect(
         label,
@@ -72,27 +84,37 @@ def filtro_multiselect(df_base, coluna, label):
         default=["Todos"]
     )
 
-    # 👉 Se "Todos" estiver selecionado ou nada selecionado, não filtra
     if not selecionado or "Todos" in selecionado:
         return df_base
 
-    return df_base[df_base[coluna].isin(selecionado)]
+    selecionado_norm = [normalizar(v) for v in selecionado]
 
-# 🔗 filtros em cascata (AMARRADOS)
-df_filtrado = df.copy()
+    return df_aux[
+        df_aux[col_norm].isin(selecionado_norm)
+    ].drop(columns=[col_norm])
 
-df_filtrado = filtro_multiselect(df_filtrado, "anoEmpenho", "📅 Exercício")
-df_filtrado = filtro_multiselect(df_filtrado, "nomeEntidade", "🏢 Entidade")
-df_filtrado = filtro_multiselect(df_filtrado, "Descrição da despesa", "📂 Natureza da Despesa")
-df_filtrado = filtro_multiselect(df_filtrado, "nomeCredor", "🏷️ Credor")
-df_filtrado = filtro_multiselect(df_filtrado, "numRecurso", "💰 Fonte de Recurso")
+# ==================================
+# FILTROS (VERTICAIS – CASCATA)
+# ==================================
+st.markdown("### 🔎 Filtros")
 
+df_f = df.copy()
+
+df_f = filtro_multiselect(df_f, "anoEmpenho", "📅 Exercício")
+df_f = filtro_multiselect(df_f, "nomeEntidade", "🏢 Entidade")
+df_f = filtro_multiselect(df_f, "Descrição da despesa", "📂 Natureza da Despesa")
+df_f = filtro_multiselect(df_f, "nomeCredor", "🏷️ Credor")
+df_f = filtro_multiselect(df_f, "numRecurso", "💰 Fonte de Recurso")
+
+if df_f.empty:
+    st.info("Nenhum dado para os filtros selecionados.")
+    st.stop()
 
 # ==================================
 # AGRUPAMENTO PARA O GRÁFICO
 # ==================================
 df_graf = (
-    df_filtrado
+    df_f
     .groupby("anoEmpenho", as_index=False)["saldoBaixado"]
     .sum()
 )
@@ -130,7 +152,7 @@ st.altair_chart(graf, use_container_width=True)
 # ==================================
 st.subheader("📋 Detalhamento")
 
-tabela = df_filtrado[
+tabela = df_f[
     [
         "anoEmpenho",
         "nomeEntidade",
@@ -171,7 +193,7 @@ tabela = tabela[
 st.dataframe(tabela, use_container_width=True)
 
 # ==================================
-# DOWNLOAD
+# DOWNLOAD CSV
 # ==================================
 st.divider()
 
