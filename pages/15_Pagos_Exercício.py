@@ -64,14 +64,16 @@ st.markdown("### 🔎 Filtros")
 
 def filtro_multiselect(df_base, coluna, label):
     opcoes = sorted(df_base[coluna].dropna().unique().tolist())
+    opcoes = ["Todos"] + opcoes  # 👈 adiciona Todos
 
     selecionado = st.multiselect(
         label,
         options=opcoes,
-        default=opcoes
+        default=["Todos"]
     )
 
-    if not selecionado:
+    # 👉 Se "Todos" estiver selecionado ou nada selecionado, não filtra
+    if not selecionado or "Todos" in selecionado:
         return df_base
 
     return df_base[df_base[coluna].isin(selecionado)]
