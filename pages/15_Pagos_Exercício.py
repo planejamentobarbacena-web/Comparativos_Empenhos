@@ -137,9 +137,17 @@ tabela = df_filtrado[
         "Descrição da despesa",
         "nomeCredor",
         "numRecurso",
+        "valorEmpenhadoBruto",
         "saldoBaixado"
     ]
 ].copy()
+
+tabela["Empenhado Bruto"] = tabela["valorEmpenhadoBruto"].apply(
+    lambda x: f"R$ {x:,.2f}"
+    .replace(",", "X")
+    .replace(".", ",")
+    .replace("X", ".")
+)
 
 tabela["Valor Pago"] = tabela["saldoBaixado"].apply(
     lambda x: f"R$ {x:,.2f}"
@@ -155,6 +163,7 @@ tabela = tabela[
         "Descrição da despesa",
         "nomeCredor",
         "numRecurso",
+        "Empenhado Bruto",
         "Valor Pago"
     ]
 ]
