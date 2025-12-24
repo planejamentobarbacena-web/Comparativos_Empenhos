@@ -76,15 +76,15 @@ def filtro_multiselect(df_base, coluna, label):
 
     return df_base[df_base[coluna].isin(selecionado)]
 
-df_filtrado = filtro_multiselect("anoEmpenho", "📅 Exercício")
-df_filtrado = filtro_multiselect("nomeEntidade", "🏢 Entidade")
-df_filtrado = filtro_multiselect("nomeCredor", "🏷️ Credor")
-df_filtrado = filtro_multiselect("numRecurso", "💰 Fonte de Recurso")
-df_filtrado = filtro_multiselect("Descrição da despesa", "📂 Natureza da Despesa")
+# 🔗 filtros em cascata (AMARRADOS)
+df_filtrado = df.copy()
 
-if df_filtrado.empty:
-    st.info("Nenhum dado para os filtros selecionados.")
-    st.stop()
+df_filtrado = filtro_multiselect(df_filtrado, "anoEmpenho", "📅 Exercício")
+df_filtrado = filtro_multiselect(df_filtrado, "nomeEntidade", "🏢 Entidade")
+df_filtrado = filtro_multiselect(df_filtrado, "Descrição da despesa", "📂 Natureza da Despesa")
+df_filtrado = filtro_multiselect(df_filtrado, "nomeCredor", "🏷️ Credor")
+df_filtrado = filtro_multiselect(df_filtrado, "numRecurso", "💰 Fonte de Recurso")
+
 
 # ==================================
 # AGRUPAMENTO PARA O GRÁFICO
