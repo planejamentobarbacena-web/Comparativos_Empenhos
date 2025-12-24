@@ -1,75 +1,110 @@
 import streamlit as st
-import pandas as pd
 import altair as alt
+import pandas as pd
 
-# ===============================
-# CONFIGURAÇÃO DA PÁGINA
-# ===============================
-st.set_page_config(
-    page_title="Pagos no Exercício",
-    layout="wide"
-)
+from auth import login
+from components.header import render_header
+from data_loader import load_empenhos
 
-st.markdown("## 💰 Pagos no Exercício")
+# ==================================
+# CONFIGURAÇÃO / SEGURANÇA
+# ==================================
+login()
+render_header()
 
-# ===============================
-# VERIFICA SE OS DADOS EXISTEM
-# ===============================
-if "df" not in st.session_state:
-    st.error("Os dados ainda não foram carregados. Volte à página inicial.")
+st.title("💰 Pagos no Exercício")
+
+# ==================================
+# CARREGAR DADOS (PADRÃO DO PROJETO)
+# ==================================
+df = load_empenhos()
+
+if df.empty:
+    st.warning("Nenhum dado carregado.")
     st.stop()
 
-df = st.session_state["df"].copy()
+# ==================================
+# LIMPEZA BÁSICA
+# ==================================
+df["anoEmpenho"] = (
+    df["anoEmpenho"]
+    .astype(str)
+    .str.strip()
+    .replace(["nan", "None", ""], pd.NA)
+)
 
-# ===============================
-# FILTROS VERTICAIS E LIVRES
-# ===============================
+df["nomeEntidade"] = (
+    df["nomeEntidade"]
+    .astype(str)
+    .str.strip()
+    .replace(["nan", "None", ""], pd.NA)
+)
+
+df = df.dropna(subset=["anoEmpenho", "nomeEntidade"])
+
+# ==================================
+# TRATAMENTO DO VALOR USADO NO PAINEL
+# ==================================
+df["saldoBaixado"] = (
+    df["saldoBaixado"]
+    .astype(str)
+    .str.replace(".", "", regex=False)
+    .str.replace(",", ".", regex=False)
+)
+
+df["saldoBaixado"] = pd.to_numeric(
+    df["saldoBaixado"],
+    errors="coerce"
+).fillna(0)
+
+# ==================================
+# FILTROS LIVRES (VERTICAIS)
+# ==================================
 st.markdown("### 🔎 Filtros")
 
-def filtro_multiselect(df_base, coluna, label):
-    opcoes = ["Todos"] + sorted(df_base[coluna].dropna().unique().tolist())
+def filtro_multiselect(coluna, label):
+    opcoes = ["Todos"] + sorted(df[coluna].dropna().unique().tolist())
     selecionado = st.multiselect(
         label,
         options=opcoes,
         default=["Todos"]
     )
 
-    if "Todos" in selecionado or len(selecionado) == 0:
-        return df_base
+    if "Todos" in selecionado or not selecionado:
+        return df
 
-    return df_base[df_base[coluna].isin(selecionado)]
+    return df[df[coluna].isin(selecionado)]
 
-df_filtro = filtro_multiselect(df, "exercicio", "Exercício")
-df_filtro = filtro_multiselect(df_filtro, "entidade", "Entidade")
-df_filtro = filtro_multiselect(df_filtro, "credor", "Credor")
-df_filtro = filtro_multiselect(df_filtro, "recurso", "Recurso")
-df_filtro = filtro_multiselect(df_filtro, "naturezaDespesa", "Natureza da Despesa")
+df_filtrado = filtro_multiselect("anoEmpenho", "📅 Exercício")
+df_filtrado = filtro_multiselect("nomeEntidade", "🏢 Entidade")
+df_filtrado = filtro_multiselect("nomeCredor", "🏷️ Credor")
+df_filtrado = filtro_multiselect("numRecurso", "💰 Fonte de Recurso")
+df_filtrado = filtro_multiselect("Descrição da despesa", "📂 Natureza da Despesa")
 
-# ===============================
-# TRATAMENTO DO VALOR
-# ===============================
-df_filtro["saldoBaixado"] = pd.to_numeric(
-    df_filtro["saldoBaixado"],
-    errors="coerce"
-).fillna(0)
+if df_filtrado.empty:
+    st.info("Nenhum dado para os filtros selecionados.")
+    st.stop()
 
-# ===============================
-# GRÁFICO
-# ===============================
-st.markdown("### 📊 Total Pago por Exercício")
-
+# ==================================
+# AGRUPAMENTO PARA O GRÁFICO
+# ==================================
 df_graf = (
-    df_filtro
-    .groupby("exercicio", as_index=False)["saldoBaixado"]
+    df_filtrado
+    .groupby("anoEmpenho", as_index=False)["saldoBaixado"]
     .sum()
 )
+
+# ==================================
+# GRÁFICO – PAGOS NO EXERCÍCIO
+# ==================================
+st.markdown("### 📊 Total Pago por Exercício")
 
 graf = (
     alt.Chart(df_graf)
     .mark_bar(size=60)
     .encode(
         x=alt.X(
-            "exercicio:N",
+            "anoEmpenho:N",
             title="Exercício",
             axis=alt.Axis(labelAngle=0)
         ),
@@ -78,7 +113,7 @@ graf = (
             title="Valor Pago (R$)"
         ),
         tooltip=[
-            alt.Tooltip("exercicio:N", title="Exercício"),
+            alt.Tooltip("anoEmpenho:N", title="Exercício"),
             alt.Tooltip("saldoBaixado:Q", title="Valor Pago", format=",.2f")
         ]
     )
@@ -87,21 +122,52 @@ graf = (
 
 st.altair_chart(graf, use_container_width=True)
 
-# ===============================
-# TABELA
-# ===============================
-st.markdown("### 📄 Detalhamento")
+# ==================================
+# TABELA DETALHADA
+# ==================================
+st.subheader("📋 Detalhamento")
 
-st.dataframe(
-    df_filtro[
-        [
-            "exercicio",
-            "entidade",
-            "credor",
-            "recurso",
-            "naturezaDespesa",
-            "saldoBaixado"
-        ]
-    ],
-    use_container_width=True
+tabela = df_filtrado[
+    [
+        "anoEmpenho",
+        "nomeEntidade",
+        "Descrição da despesa",
+        "nomeCredor",
+        "numRecurso",
+        "saldoBaixado"
+    ]
+].copy()
+
+tabela["Valor Pago"] = tabela["saldoBaixado"].apply(
+    lambda x: f"R$ {x:,.2f}"
+    .replace(",", "X")
+    .replace(".", ",")
+    .replace("X", ".")
+)
+
+tabela = tabela[
+    [
+        "anoEmpenho",
+        "nomeEntidade",
+        "Descrição da despesa",
+        "nomeCredor",
+        "numRecurso",
+        "Valor Pago"
+    ]
+]
+
+st.dataframe(tabela, use_container_width=True)
+
+# ==================================
+# DOWNLOAD
+# ==================================
+st.divider()
+
+csv = tabela.to_csv(index=False, sep=";", encoding="utf-8-sig")
+
+st.download_button(
+    "📥 Baixar CSV – Pagos no Exercício",
+    csv,
+    file_name="pagos_no_exercicio.csv",
+    mime="text/csv"
 )
