@@ -67,19 +67,19 @@ for col in colunas_valor:
 # ==================================
 # MÉTRICAS
 # ==================================
-col1, col2, col3 = st.columns(3)
+c1, c2, c3 = st.columns(3)
 
-col1.metric(
+c1.metric(
     "💰 Total Empenhado",
     f"R$ {df['valorEmpenhadoBruto'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
 
-col2.metric(
+c2.metric(
     "❌ Total Anulado",
     f"R$ {df['valorEmpenhadoAnulado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
 
-col3.metric(
+c3.metric(
     "✅ Total Baixado",
     f"R$ {df['saldoBaixado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 )
@@ -92,12 +92,12 @@ st.divider()
 anos = sorted(df["anoEmpenho"].unique())
 entidades = sorted(df["nomeEntidade"].unique())
 
-c1, c2 = st.columns(2)
+f1, f2 = st.columns(2)
 
-with c1:
+with f1:
     ano_sel = st.multiselect("📅 Exercício", anos, default=anos)
 
-with c2:
+with f2:
     entidade_sel = st.multiselect("🏢 Entidade", entidades, default=entidades)
 
 df = df[
@@ -117,7 +117,7 @@ df_graf = (
     })
 )
 
-# Restos a Pagar
+# Restos a pagar
 df_graf["Restos a Pagar"] = (
     df_graf["valorEmpenhadoBruto"]
     - df_graf["valorEmpenhadoAnulado"]
@@ -136,6 +136,7 @@ df_long = df_graf.melt(
     value_name="Valor"
 )
 
+# Renomear tipos
 mapa_tipos = {
     "valorEmpenhadoAnulado": "Anulado",
     "Restos a Pagar": "Restos a Pagar",
@@ -151,17 +152,15 @@ ordem_tipo = [
     "Baixado no Exercício"
 ]
 
-# ==================================
-# PERCENTUAL
-# ==================================
-df_totais = (
-    df_long.groupby("anoEmpenho", as_index=False)["Valor"]
-    .sum()
-    .rename(columns={"Valor": "Total"})
-)
-
-df_long = df_long.merge(df_totais, on="anoEmpenho")
+# Percentual por exercício
+df_long["Total"] = df_long.groupby("anoEmpenho")["Valor"].transform("sum")
 df_long["Percentual"] = df_long["Valor"] / df_long["Total"]
+
+# Posição correta do texto dentro da barra
+df_long["y_text"] = (
+    df_long.groupby("anoEmpenho")["Valor"].cumsum()
+    - (df_long["Valor"] / 2)
+)
 
 # ==================================
 # GRÁFICO
@@ -210,15 +209,16 @@ base = (
 barras = base.mark_bar(size=60)
 
 texto = (
-    base
+    alt.Chart(df_long)
     .mark_text(
-        color="white",
+        color="black",
         fontSize=12,
         fontWeight="bold"
     )
     .encode(
-        text=alt.Text("Percentual:Q", format=".0%"),
-        y=alt.Y("Valor:Q", stack="center")
+        x="anoEmpenho:N",
+        y=alt.Y("y_text:Q"),
+        text=alt.Text("Percentual:Q", format=".0%")
     )
 )
 
