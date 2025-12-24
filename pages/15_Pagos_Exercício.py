@@ -3,7 +3,7 @@ import pandas as pd
 import altair as alt
 
 # ===============================
-# CONFIGURAÇÃO INICIAL
+# CONFIGURAÇÃO DA PÁGINA
 # ===============================
 st.set_page_config(
     page_title="Pagos no Exercício",
@@ -13,48 +13,40 @@ st.set_page_config(
 st.markdown("## 💰 Pagos no Exercício")
 
 # ===============================
-# CARREGAMENTO DOS DADOS
+# VERIFICA SE OS DADOS EXISTEM
 # ===============================
-@st.cache_data
-def carregar_dados():
-    df = pd.read_csv("dados.csv")  # ajuste se necessário
-    return df
+if "df" not in st.session_state:
+    st.error("Os dados ainda não foram carregados. Volte à página inicial.")
+    st.stop()
 
-df = carregar_dados()
+df = st.session_state["df"].copy()
 
 # ===============================
-# FILTROS (VERTICAIS E INDEPENDENTES)
+# FILTROS VERTICAIS E LIVRES
 # ===============================
 st.markdown("### 🔎 Filtros")
 
-def filtro_multiselect(df, coluna, label):
-    opcoes = ["Todos"] + sorted(df[coluna].dropna().unique().tolist())
+def filtro_multiselect(df_base, coluna, label):
+    opcoes = ["Todos"] + sorted(df_base[coluna].dropna().unique().tolist())
     selecionado = st.multiselect(
         label,
         options=opcoes,
-        default="Todos"
+        default=["Todos"]
     )
-    if "Todos" in selecionado or selecionado == []:
-        return df
-    return df[df[coluna].isin(selecionado)]
 
-# Exercício
+    if "Todos" in selecionado or len(selecionado) == 0:
+        return df_base
+
+    return df_base[df_base[coluna].isin(selecionado)]
+
 df_filtro = filtro_multiselect(df, "exercicio", "Exercício")
-
-# Entidade
 df_filtro = filtro_multiselect(df_filtro, "entidade", "Entidade")
-
-# Credor
 df_filtro = filtro_multiselect(df_filtro, "credor", "Credor")
-
-# Recurso
 df_filtro = filtro_multiselect(df_filtro, "recurso", "Recurso")
-
-# Natureza da Despesa
 df_filtro = filtro_multiselect(df_filtro, "naturezaDespesa", "Natureza da Despesa")
 
 # ===============================
-# TRATAMENTO DOS DADOS
+# TRATAMENTO DO VALOR
 # ===============================
 df_filtro["saldoBaixado"] = pd.to_numeric(
     df_filtro["saldoBaixado"],
@@ -62,7 +54,7 @@ df_filtro["saldoBaixado"] = pd.to_numeric(
 ).fillna(0)
 
 # ===============================
-# GRÁFICO PRINCIPAL
+# GRÁFICO
 # ===============================
 st.markdown("### 📊 Total Pago por Exercício")
 
@@ -96,7 +88,7 @@ graf = (
 st.altair_chart(graf, use_container_width=True)
 
 # ===============================
-# TABELA DETALHADA
+# TABELA
 # ===============================
 st.markdown("### 📄 Detalhamento")
 
