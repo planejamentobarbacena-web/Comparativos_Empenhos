@@ -117,12 +117,14 @@ df_graf = (
     })
 )
 
+# Restos a Pagar
 df_graf["Restos a Pagar"] = (
     df_graf["valorEmpenhadoBruto"]
     - df_graf["valorEmpenhadoAnulado"]
     - df_graf["saldoBaixado"]
 )
 
+# Formato longo
 df_long = df_graf.melt(
     id_vars="anoEmpenho",
     value_vars=[
@@ -150,13 +152,24 @@ ordem_tipo = [
 ]
 
 # ==================================
+# PERCENTUAL
+# ==================================
+df_totais = (
+    df_long.groupby("anoEmpenho", as_index=False)["Valor"]
+    .sum()
+    .rename(columns={"Valor": "Total"})
+)
+
+df_long = df_long.merge(df_totais, on="anoEmpenho")
+df_long["Percentual"] = df_long["Valor"] / df_long["Total"]
+
+# ==================================
 # GRÁFICO
 # ==================================
 st.markdown("### 📊 Composição do Empenhado por Exercício")
 
-graf = (
+base = (
     alt.Chart(df_long)
-    .mark_bar(size=60)  # largura equilibrada (desktop + celular)
     .encode(
         x=alt.X(
             "anoEmpenho:N",
@@ -188,11 +201,28 @@ graf = (
         tooltip=[
             "anoEmpenho:N",
             "Tipo:N",
-            alt.Tooltip("Valor:Q", format=",.2f")
+            alt.Tooltip("Valor:Q", format=",.2f"),
+            alt.Tooltip("Percentual:Q", format=".1%")
         ]
     )
-    .properties(height=420)
 )
+
+barras = base.mark_bar(size=60)
+
+texto = (
+    base
+    .mark_text(
+        color="white",
+        fontSize=12,
+        fontWeight="bold"
+    )
+    .encode(
+        text=alt.Text("Percentual:Q", format=".0%"),
+        y=alt.Y("Valor:Q", stack="center")
+    )
+)
+
+graf = (barras + texto).properties(height=420)
 
 st.altair_chart(graf, use_container_width=True)
 
@@ -201,9 +231,7 @@ st.altair_chart(graf, use_container_width=True)
 # ==================================
 st.subheader("📋 Resumo por Exercício")
 
-tabela = df_graf.copy()
-
-tabela = tabela.rename(columns={
+tabela = df_graf.rename(columns={
     "valorEmpenhadoBruto": "Empenhado",
     "valorEmpenhadoAnulado": "Anulado",
     "saldoBaixado": "Baixado no Exercício"
