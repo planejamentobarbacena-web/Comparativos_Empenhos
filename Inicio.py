@@ -32,8 +32,6 @@ if df.empty:
 # ==================================
 # TRATAMENTO BÁSICO
 # ==================================
-
-# Exercício
 df["anoEmpenho"] = (
     df["anoEmpenho"]
     .astype(str)
@@ -41,21 +39,12 @@ df["anoEmpenho"] = (
     .str.strip()
 )
 
-# Entidade
 df["nomeEntidade"] = df["nomeEntidade"].fillna("").astype(str).str.strip()
 
-# Remover registros inválidos
 df = df[(df["anoEmpenho"] != "") & (df["anoEmpenho"] != "nan")]
 df = df[df["nomeEntidade"] != ""]
 
-# Conversão numérica
-colunas_valor = [
-    "valorEmpenhadoBruto",
-    "valorEmpenhadoAnulado",
-    "saldoBaixado"
-]
-
-for col in colunas_valor:
+for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "saldoBaixado"]:
     df[col] = (
         df[col]
         .astype(str)
@@ -69,20 +58,9 @@ for col in colunas_valor:
 # ==================================
 c1, c2, c3 = st.columns(3)
 
-c1.metric(
-    "💰 Total Empenhado",
-    f"R$ {df['valorEmpenhadoBruto'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
-
-c2.metric(
-    "❌ Total Anulado",
-    f"R$ {df['valorEmpenhadoAnulado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
-
-c3.metric(
-    "✅ Total Baixado",
-    f"R$ {df['saldoBaixado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
+c1.metric("💰 Total Empenhado", f"R$ {df['valorEmpenhadoBruto'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+c2.metric("❌ Total Anulado", f"R$ {df['valorEmpenhadoAnulado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+c3.metric("✅ Total Baixado", f"R$ {df['saldoBaixado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
 # ==================================
 # FILTROS
@@ -96,14 +74,10 @@ f1, f2 = st.columns(2)
 
 with f1:
     ano_sel = st.multiselect("📅 Exercício", anos, default=anos)
-
 with f2:
     entidade_sel = st.multiselect("🏢 Entidade", entidades, default=entidades)
 
-df = df[
-    df["anoEmpenho"].isin(ano_sel) &
-    df["nomeEntidade"].isin(entidade_sel)
-]
+df = df[df["anoEmpenho"].isin(ano_sel) & df["nomeEntidade"].isin(entidade_sel)]
 
 # ==================================
 # PREPARAÇÃO DO GRÁFICO
@@ -117,14 +91,12 @@ df_graf = (
     })
 )
 
-# Restos a pagar
 df_graf["Restos a Pagar"] = (
     df_graf["valorEmpenhadoBruto"]
     - df_graf["valorEmpenhadoAnulado"]
     - df_graf["saldoBaixado"]
 )
 
-# Formato longo
 df_long = df_graf.melt(
     id_vars="anoEmpenho",
     value_vars=[
@@ -136,90 +108,57 @@ df_long = df_graf.melt(
     value_name="Valor"
 )
 
-# Renomear tipos
-mapa_tipos = {
+mapa = {
     "valorEmpenhadoAnulado": "Anulado",
     "Restos a Pagar": "Restos a Pagar",
     "saldoBaixado": "Baixado no Exercício"
 }
+df_long["Tipo"] = df_long["Tipo"].map(mapa)
 
-df_long["Tipo"] = df_long["Tipo"].map(mapa_tipos)
+ordem_tipo = ["Anulado", "Restos a Pagar", "Baixado no Exercício"]
 
-# Ordem da pilha (baixo → cima)
-ordem_tipo = [
-    "Anulado",
-    "Restos a Pagar",
-    "Baixado no Exercício"
-]
-
-# Percentual por exercício
+# Percentual
 df_long["Total"] = df_long.groupby("anoEmpenho")["Valor"].transform("sum")
 df_long["Percentual"] = df_long["Valor"] / df_long["Total"]
-
-# Posição correta do texto dentro da barra
-df_long["y_text"] = (
-    df_long.groupby("anoEmpenho")["Valor"].cumsum()
-    - (df_long["Valor"] / 2)
-)
 
 # ==================================
 # GRÁFICO
 # ==================================
 st.markdown("### 📊 Composição do Empenhado por Exercício")
 
-base = (
-    alt.Chart(df_long)
-    .encode(
-        x=alt.X(
-            "anoEmpenho:N",
-            title="Exercício",
-            axis=alt.Axis(labelAngle=0),
-            scale=alt.Scale(
-                paddingInner=0.15,
-                paddingOuter=0.05
-            )
+base = alt.Chart(df_long).encode(
+    x=alt.X(
+        "anoEmpenho:N",
+        title="Exercício",
+        axis=alt.Axis(labelAngle=0),
+        scale=alt.Scale(paddingInner=0.15, paddingOuter=0.05)
+    ),
+    y=alt.Y(
+        "Valor:Q",
+        stack="zero",
+        title="Valor (R$)"
+    ),
+    color=alt.Color(
+        "Tipo:N",
+        sort=ordem_tipo,
+        scale=alt.Scale(
+            domain=ordem_tipo,
+            range=["#d62728", "#ffbb78", "#2ca02c"]
         ),
-        y=alt.Y(
-            "Valor:Q",
-            title="Valor (R$)",
-            stack="zero"
-        ),
-        color=alt.Color(
-            "Tipo:N",
-            sort=ordem_tipo,
-            title="Composição",
-            scale=alt.Scale(
-                domain=ordem_tipo,
-                range=["#d62728", "#ffbb78", "#2ca02c"]
-            ),
-            legend=alt.Legend(
-                orient="bottom",
-                direction="horizontal"
-            )
-        ),
-        tooltip=[
-            "anoEmpenho:N",
-            "Tipo:N",
-            alt.Tooltip("Valor:Q", format=",.2f"),
-            alt.Tooltip("Percentual:Q", format=".1%")
-        ]
+        legend=alt.Legend(orient="bottom", direction="horizontal")
     )
 )
 
 barras = base.mark_bar(size=60)
 
-texto = (
-    alt.Chart(df_long)
-    .mark_text(
-        color="black",
-        fontSize=12,
-        fontWeight="bold"
-    )
-    .encode(
-        x="anoEmpenho:N",
-        y=alt.Y("y_text:Q"),
-        text=alt.Text("Percentual:Q", format=".0%")
-    )
+# 🔥 TEXTO CORRETO (centralizado em cada faixa)
+texto = base.mark_text(
+    color="black",
+    fontSize=12,
+    fontWeight="bold"
+).encode(
+    text=alt.Text("Percentual:Q", format=".0%"),
+    y=alt.Y("Valor:Q", stack="center")  # 👈 A CHAVE DO SUCESSO
 )
 
 graf = (barras + texto).properties(height=420)
@@ -227,7 +166,7 @@ graf = (barras + texto).properties(height=420)
 st.altair_chart(graf, use_container_width=True)
 
 # ==================================
-# TABELA RESUMO
+# TABELA
 # ==================================
 st.subheader("📋 Resumo por Exercício")
 
