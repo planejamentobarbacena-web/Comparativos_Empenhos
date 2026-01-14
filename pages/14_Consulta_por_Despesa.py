@@ -221,13 +221,14 @@ tabela["Saldo Baixado"] = tabela["saldoBaixado"].apply(
 
 tabela = tabela[
     [
-        "anoEmpenho",
-        "nomeEntidade",
+        "anoEmpenho",        
         "Descrição da despesa",
         "nomeCredor",
         "numRecurso",
-        "Empenhado Líquido",
-        "Saldo Baixado"
+        "empenhado_liquido",
+        "saldoBaixado",
+        "especificacao",
+        "nomeEntidade"
     ]
 ]
 
