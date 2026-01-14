@@ -200,13 +200,14 @@ st.subheader("📊 Detalhamento")
 
 tabela = df[
     [
-        "anoEmpenho",
-        "nomeEntidade",
+        "anoEmpenho",        
         "Descrição da despesa",
         "nomeCredor",
         "numRecurso",
         "empenhado_liquido",
-        "saldoBaixado"
+        "saldoBaixado",
+        "especificacao",
+        "nomeEntidade"
     ]
 ].copy()
 
