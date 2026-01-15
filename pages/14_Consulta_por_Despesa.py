@@ -225,8 +225,8 @@ tabela = tabela[
         "Descrição da despesa",
         "nomeCredor",
         "numRecurso",
-        "empenhado_liquido",
-        "saldoBaixado",
+        "Empenhado Líquido",   # ✅ formatado
+        "Saldo Baixado",      # ✅ formatado
         "especificacao",
         "nomeEntidade"
     ]
