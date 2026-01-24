@@ -109,7 +109,7 @@ df["especificacao_norm"] = (
 # ==========================
 palavra = st.text_input(
     "🔍 Palavra-chave para busca",
-    placeholder="Ex: sonho de natal"
+    placeholder="Ex: Carnaval"
 )
 
 if not palavra:
