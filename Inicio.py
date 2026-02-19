@@ -7,7 +7,7 @@ from components.header import render_header
 from data_loader import load_empenhos  
 
 # ==================================
-# CONFIGURAÇÃO
+# CONFIGURAÇÃO DA PÁGINA
 # ==================================
 st.set_page_config(
     page_title="Painel de Empenhos",
@@ -30,7 +30,7 @@ if df.empty:
     st.stop()
 
 # ==================================
-# TRATAMENTO BÁSICO
+# TRATAMENTO DOS DADOS
 # ==================================
 df["anoEmpenho"] = (
     df["anoEmpenho"]
@@ -39,7 +39,12 @@ df["anoEmpenho"] = (
     .str.strip()
 )
 
-df["nomeEntidade"] = df["nomeEntidade"].fillna("").astype(str).str.strip()
+df["nomeEntidade"] = (
+    df["nomeEntidade"]
+    .fillna("")
+    .astype(str)
+    .str.strip()
+)
 
 df = df[(df["anoEmpenho"] != "") & (df["anoEmpenho"] != "nan")]
 df = df[df["nomeEntidade"] != ""]
@@ -54,24 +59,6 @@ for col in ["valorEmpenhadoBruto", "valorEmpenhadoAnulado", "saldoBaixado"]:
     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
 # ==================================
-# MÉTRICAS
-# ==================================
-c1, c2, c3 = st.columns(3)
-
-c1.metric(
-    "💰 Total Empenhado",
-    f"R$ {df['valorEmpenhadoBruto'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
-c2.metric(
-    "❌ Total Anulado",
-    f"R$ {df['valorEmpenhadoAnulado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
-c3.metric(
-    "✅ Total Baixado",
-    f"R$ {df['saldoBaixado'].sum():,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-)
-
-# ==================================
 # FILTROS
 # ==================================
 st.divider()
@@ -83,16 +70,51 @@ f1, f2 = st.columns(2)
 
 with f1:
     ano_sel = st.multiselect("📅 Exercício", anos, default=anos)
+
 with f2:
     entidade_sel = st.multiselect("🏢 Entidade", entidades, default=entidades)
 
-df = df[df["anoEmpenho"].isin(ano_sel) & df["nomeEntidade"].isin(entidade_sel)]
+# DF FILTRADO (mantém original intacto)
+df_filtrado = df[
+    df["anoEmpenho"].isin(ano_sel) &
+    df["nomeEntidade"].isin(entidade_sel)
+]
+
+if df_filtrado.empty:
+    st.warning("Nenhum dado encontrado para o filtro selecionado.")
+    st.stop()
+
+# ==================================
+# MÉTRICAS
+# ==================================
+st.markdown("### 📌 Indicadores Gerais")
+
+c1, c2, c3 = st.columns(3)
+
+def formatar_moeda(valor):
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+c1.metric(
+    "💰 Total Empenhado",
+    formatar_moeda(df_filtrado["valorEmpenhadoBruto"].sum())
+)
+
+c2.metric(
+    "❌ Total Anulado",
+    formatar_moeda(df_filtrado["valorEmpenhadoAnulado"].sum())
+)
+
+c3.metric(
+    "✅ Total Baixado",
+    formatar_moeda(df_filtrado["saldoBaixado"].sum())
+)
 
 # ==================================
 # PREPARAÇÃO DO GRÁFICO
 # ==================================
 df_graf = (
-    df.groupby("anoEmpenho", as_index=False)
+    df_filtrado
+    .groupby("anoEmpenho", as_index=False)
     .agg({
         "valorEmpenhadoBruto": "sum",
         "valorEmpenhadoAnulado": "sum",
@@ -122,11 +144,12 @@ mapa_tipos = {
     "Restos a Pagar": "Restos a Pagar",
     "saldoBaixado": "Baixado no Exercício"
 }
+
 df_long["Tipo"] = df_long["Tipo"].map(mapa_tipos)
 
 ordem_tipo = ["Anulado", "Restos a Pagar", "Baixado no Exercício"]
 
-# Percentual (APENAS PARA TOOLTIP)
+# Percentual para tooltip
 df_totais = (
     df_long.groupby("anoEmpenho", as_index=False)["Valor"]
     .sum()
@@ -145,17 +168,8 @@ graf = (
     alt.Chart(df_long)
     .mark_bar(size=60)
     .encode(
-        x=alt.X(
-            "anoEmpenho:N",
-            title="Exercício",
-            axis=alt.Axis(labelAngle=0),
-            scale=alt.Scale(paddingInner=0.15, paddingOuter=0.05)
-        ),
-        y=alt.Y(
-            "Valor:Q",
-            title="Valor (R$)",
-            stack="zero"
-        ),
+        x=alt.X("anoEmpenho:N", title="Exercício"),
+        y=alt.Y("Valor:Q", title="Valor (R$)", stack="zero"),
         color=alt.Color(
             "Tipo:N",
             sort=ordem_tipo,
@@ -164,10 +178,7 @@ graf = (
                 domain=ordem_tipo,
                 range=["#d62728", "#ffbb78", "#2ca02c"]
             ),
-            legend=alt.Legend(
-                orient="bottom",
-                direction="horizontal"
-            )
+            legend=alt.Legend(orient="bottom", direction="horizontal")
         ),
         tooltip=[
             "anoEmpenho:N",
@@ -193,8 +204,6 @@ tabela = df_graf.rename(columns={
 })
 
 for col in ["Empenhado", "Anulado", "Baixado no Exercício", "Restos a Pagar"]:
-    tabela[col] = tabela[col].apply(
-        lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    )
+    tabela[col] = tabela[col].apply(formatar_moeda)
 
 st.dataframe(tabela, use_container_width=True)
