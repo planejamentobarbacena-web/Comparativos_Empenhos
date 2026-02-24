@@ -59,10 +59,9 @@ if df.empty:
     st.warning("Nenhum dado carregado.")
     st.stop()
 
-# ==================================
-# LIMPEZA SEGURA
-# ==================================
-df.columns = df.columns.str.strip()
+# =======================
+# LIMPEZA DEFINITIVA (PADRÃO DA PÁGINA BOA)
+# =======================
 
 colunas_texto = [
     "anoEmpenho",
@@ -74,7 +73,15 @@ colunas_texto = [
 
 for col in colunas_texto:
     if col in df.columns:
-        df[col] = df[col].fillna("").astype(str).str.strip()
+        df[col] = (
+            df[col]
+            .astype(str)
+            .str.strip()
+            .replace(["nan", "None", ""], pd.NA)
+        )
+
+# Remove linhas inválidas principais
+df = df.dropna(subset=["anoEmpenho", "nomeEntidade"])
 
 # ==================================
 # TRATAMENTO DOS VALORES
