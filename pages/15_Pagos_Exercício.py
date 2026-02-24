@@ -26,27 +26,29 @@ def normalizar_texto(txt):
     return "".join(c for c in txt if not unicodedata.combining(c)).lower().strip()
 
 def filtro_multiselect(df_base, coluna, label, normalizar=False):
+    if coluna not in df_base.columns:
+        return df_base
+
+    df_temp = df_base.copy()
+
     if normalizar:
-        df_base["_filtro_norm"] = df_base[coluna].apply(normalizar_texto)
-        opcoes = sorted(df_base["_filtro_norm"].unique().tolist())
+        df_temp["_filtro_norm"] = df_temp[coluna].apply(normalizar_texto)
+        opcoes = sorted(df_temp["_filtro_norm"].dropna().unique().tolist())
     else:
-        opcoes = sorted(df_base[coluna].dropna().unique().tolist())
+        opcoes = sorted(df_temp[coluna].dropna().unique().tolist())
 
     opcoes = ["Todos"] + opcoes
 
-    selecionado = st.multiselect(
-        label,
-        options=opcoes,
-        default=["Todos"]
-    )
+    selecionado = st.multiselect(label, options=opcoes, default=["Todos"])
 
     if "Todos" in selecionado or not selecionado:
         return df_base
 
     if normalizar:
-        return df_base[df_base["_filtro_norm"].isin(selecionado)]
+        df_filtrado = df_temp[df_temp["_filtro_norm"].isin(selecionado)]
+        return df_filtrado.drop(columns=["_filtro_norm"], errors="ignore")
 
-    return df_base[df_base[coluna].isin(selecionado)]
+    return df_temp[df_temp[coluna].isin(selecionado)]
 
 # ==================================
 # CARREGAR DADOS
@@ -58,27 +60,46 @@ if df.empty:
     st.stop()
 
 # ==================================
-# LIMPEZA BÁSICA
+# LIMPEZA SEGURA
 # ==================================
-df["anoEmpenho"] = df["anoEmpenho"].astype(str).str.strip()
-df["nomeEntidade"] = df["nomeEntidade"].astype(str).str.strip()
-df["nomeCredor"] = df["nomeCredor"].astype(str).str.strip()
-df["Descrição da despesa"] = df["Descrição da despesa"].astype(str).str.strip()
+df.columns = df.columns.str.strip()
+
+colunas_texto = [
+    "anoEmpenho",
+    "nomeEntidade",
+    "nomeCredor",
+    "Descrição da despesa",
+    "numRecurso"
+]
+
+for col in colunas_texto:
+    if col in df.columns:
+        df[col] = df[col].fillna("").astype(str).str.strip()
 
 # ==================================
 # TRATAMENTO DOS VALORES
 # ==================================
-for col in ["saldoBaixado", "valorEmpenhadoBruto"]:
-    df[col] = (
-        df[col]
-        .astype(str)
-        .str.replace(".", "", regex=False)
-        .str.replace(",", ".", regex=False)
-    )
-    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+colunas_valor = ["saldoBaixado", "valorEmpenhadoBruto"]
+
+for col in colunas_valor:
+    if col in df.columns:
+        df[col] = (
+            df[col]
+            .astype(str)
+            .str.replace(".", "", regex=False)
+            .str.replace(",", ".", regex=False)
+        )
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+# Remove registros sem ano válido
+df = df[df["anoEmpenho"] != ""]
+
+if df.empty:
+    st.warning("Nenhum dado válido encontrado.")
+    st.stop()
 
 # ==================================
-# FILTROS (VERTICAIS)
+# FILTROS
 # ==================================
 st.markdown("### 🔎 Filtros")
 
@@ -103,7 +124,7 @@ if df_filtrado.empty:
     st.stop()
 
 # ==================================
-# AGRUPAMENTO PARA O GRÁFICO
+# AGRUPAMENTO
 # ==================================
 df_graf = (
     df_filtrado
@@ -112,7 +133,7 @@ df_graf = (
 )
 
 # ==================================
-# GRÁFICO – PAGOS NO EXERCÍCIO
+# GRÁFICO
 # ==================================
 st.markdown("### 📊 Total Pago por Exercício")
 
@@ -120,16 +141,8 @@ graf = (
     alt.Chart(df_graf)
     .mark_bar(size=60)
     .encode(
-        x=alt.X(
-            "anoEmpenho:N",
-            title="Exercício",
-            axis=alt.Axis(labelAngle=0)
-        ),
-        y=alt.Y(
-            "saldoBaixado:Q",
-            title="Valor Pago (R$)",
-            axis=alt.Axis(format=",.2f")  # formato numérico correto
-        ),
+        x=alt.X("anoEmpenho:N", title="Exercício", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("saldoBaixado:Q", title="Valor Pago (R$)", axis=alt.Axis(format=",.2f")),
         tooltip=[
             alt.Tooltip("anoEmpenho:N", title="Exercício"),
             alt.Tooltip("saldoBaixado:Q", title="Valor Pago", format=",.2f")
@@ -141,21 +154,23 @@ graf = (
 st.altair_chart(graf, use_container_width=True)
 
 # ==================================
-# TABELA DETALHADA
+# TABELA
 # ==================================
 st.subheader("📋 Detalhamento")
 
-tabela = df_filtrado[
-    [
-        "anoEmpenho",
-        "nomeEntidade",
-        "Descrição da despesa",
-        "nomeCredor",
-        "numRecurso",
-        "valorEmpenhadoBruto",
-        "saldoBaixado"
-    ]
-].copy()
+colunas_exibicao = [
+    "anoEmpenho",
+    "nomeEntidade",
+    "Descrição da despesa",
+    "nomeCredor",
+    "numRecurso",
+    "valorEmpenhadoBruto",
+    "saldoBaixado"
+]
+
+colunas_exibicao = [c for c in colunas_exibicao if c in df_filtrado.columns]
+
+tabela = df_filtrado[colunas_exibicao].copy()
 
 def formata_real(valor):
     return (
@@ -165,22 +180,25 @@ def formata_real(valor):
         .replace("X", ".")
     )
 
-tabela["Valor Empenhado Bruto"] = tabela["valorEmpenhadoBruto"].apply(formata_real)
-tabela["Valor Pago"] = tabela["saldoBaixado"].apply(formata_real)
+if "valorEmpenhadoBruto" in tabela.columns:
+    tabela["Valor Empenhado Bruto"] = tabela["valorEmpenhadoBruto"].apply(formata_real)
 
-tabela = tabela[
-    [
-        "anoEmpenho",
-        "nomeEntidade",
-        "Descrição da despesa",
-        "nomeCredor",
-        "numRecurso",
-        "Valor Empenhado Bruto",
-        "Valor Pago"
-    ]
+if "saldoBaixado" in tabela.columns:
+    tabela["Valor Pago"] = tabela["saldoBaixado"].apply(formata_real)
+
+colunas_finais = [
+    "anoEmpenho",
+    "nomeEntidade",
+    "Descrição da despesa",
+    "nomeCredor",
+    "numRecurso",
+    "Valor Empenhado Bruto",
+    "Valor Pago"
 ]
 
-st.dataframe(tabela, use_container_width=True)
+colunas_finais = [c for c in colunas_finais if c in tabela.columns]
+
+st.dataframe(tabela[colunas_finais], use_container_width=True)
 
 # ==================================
 # DOWNLOAD
