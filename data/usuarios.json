@@ -1,6 +1,6 @@
 {
-  "Admin": {
-    "senha": "1234",
+  "admin": {
+    "senha": "1",
     "perfil": "ADMIN",
     "status": "ativo"
   },
@@ -10,19 +10,19 @@
     "status": "ativo"
   },
   "Tamara": {
-    "senha": "12345",
+    "senha": "t",
     "perfil": "USER",
     "status": "ativo"
   },
   "Valeria": {
     "email": "a@",
-    "senha": "123456",
+    "senha": "v",
     "perfil": "USER",
     "status": "ativo"
   },
     "Rodrigo": {
     "email": "a@",
-    "senha": "123",
+    "senha": "1",
     "perfil": "USER",
     "status": "ativo"
   },
